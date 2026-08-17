@@ -17,10 +17,12 @@
 ## Convención de grupos
 
 ```
-<g id="HEAD">...</g>   <!-- polígono + gradiente, no cambia entre expresiones -->
-<g id="EYES">...</g>
-<g id="MOUTH">...</g>
-<g id="EXTRA">...</g>  <!-- vacío en la versión base -->
+<g id="MASCOT">           <!-- cuerpo completo: target para entrada/bounce/idle -->
+  <g id="HEAD">...</g>    <!-- polígono + gradiente, no cambia entre expresiones -->
+  <g id="EYES">...</g>
+  <g id="MOUTH">...</g>
+  <g id="EXTRA">...</g>   <!-- vacío en la versión base -->
+</g>
 ```
 
 ## Cómo crear una variante/expresión nueva

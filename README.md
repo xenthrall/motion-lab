@@ -1,30 +1,38 @@
 # Tequia Motion Lab
 
-Laboratorio experimental de animación con JavaScript/TypeScript, enfocado en
-animación SVG/DOM. El primer sujeto de experimentación será la mascota de
-Tequia, cuyo SVG base se incorporará más adelante.
+Laboratorio de animación con JavaScript/TypeScript, enfocado en animación
+SVG/DOM. El sujeto de experimentación es la mascota de Tequia
+(`src/svg/mascot/`).
 
 ## Propósito
 
-Este proyecto no es una app de producto: es un espacio para experimentar,
-desarrollar y eventualmente producir animaciones, empezando por lo simple
-(fade, transform, easing básico) hasta llegar a animaciones más compuestas
-y orgánicas (morphing de paths, timelines complejas, secuencias de
-expresión de la mascota). El objetivo final incluye poder exportar esas
-animaciones a formatos aptos para redes sociales.
+Espacio para experimentar, desarrollar y producir animaciones, desde lo
+simple (fade, transform, easing) hasta lo compuesto y orgánico (morphing,
+timelines complejas, secuencias de expresión). Incluye exportar esas
+animaciones a formatos aptos para redes sociales, directamente desde el
+navegador.
 
-Áreas que este laboratorio cubrirá con el tiempo:
+## Estado actual
 
-- Animación de SVG (transform, paths, morphing).
-- Animación de elementos DOM.
-- Motion design con JavaScript.
-- Experimentos de interacción.
-- Animaciones de branding.
-- Eventualmente, generación de contenido audiovisual (video) para redes
-  sociales.
+Ya hay una base funcional de punta a punta:
 
-**Estado actual: solo infraestructura.** No hay animaciones implementadas
-todavía — ver [Próximos experimentos](#próximos-experimentos-roadmap).
+- Un **kit de animación** (`src/animations/`) — funciones "move"
+  reutilizables sobre GSAP (entrada, idle, blink, bounce) que cualquier IA
+  o persona puede componer para generar una animación nueva a partir de un
+  prompt, sin reinventar la estructura. Ver
+  [`src/animations/README.md`](src/animations/README.md).
+- Un **primer experimento real** (`src/experiments/mascot-intro.ts`) que
+  anima la mascota combinando esos moves, registrado en
+  `src/experiments/registry.ts`.
+- Un **lab interactivo** (`npm run dev`): selector de experimento y de
+  formato/aspecto, reproducir/reiniciar en vivo en el navegador, y botón
+  de **descargar video** en el formato elegido.
+- **Exportación a video** (`src/export/`) con APIs nativas del navegador
+  (canvas + `MediaRecorder`) — sin dependencias nuevas. Ver
+  [`src/export/README.md`](src/export/README.md).
+
+Sigue habiendo mucho roadmap por delante (expresiones, morphing,
+timelines más orgánicas) — ver [Próximos experimentos](#próximos-experimentos-roadmap).
 
 ## Stack
 
@@ -35,11 +43,12 @@ todavía — ver [Próximos experimentos](#próximos-experimentos-roadmap).
 - **GSAP** — motor de animación (DOM + SVG, timelines, morphing, scroll,
   motion path). 100% gratuito desde 2025, incluidos todos los plugins.
 - **Biome** — lint + formato en una sola herramienta.
-- **SVGO** (dev) — optimización de SVG, para preparar el asset de la
-  mascota cuando llegue.
+- **SVGO** (dev) — optimización de SVG para el pipeline de assets.
 - **npm** — gestor de paquetes.
 
-Sin frameworks de UI (React, Vue, etc.) por ahora. Ver
+Exportación de video con `canvas` + `MediaRecorder` nativos del navegador
+— ninguna dependencia nueva (Remotion sigue descartado por ahora, ver
+`src/export/README.md`). Sin frameworks de UI (React, Vue, etc.). Ver
 [`docs/dependencies.md`](docs/dependencies.md) para el razonamiento
 completo de cada dependencia instalada y las descartadas.
 
@@ -47,67 +56,86 @@ completo de cada dependencia instalada y las descartadas.
 
 ```
 src/
-├── animations/     # (vacío) módulos de animación reutilizables, timelines, easings
-├── components/     # (vacío) piezas DOM/animación reutilizables, sin framework
-├── experiments/    # (vacío) un punto de entrada por experimento aislado
+├── animations/
+│   ├── moves/        # entrance, idleBreathing, blink, bounce (composables)
+│   └── README.md      # convención para componer/agregar animaciones
+├── components/       # stage.ts (escenario) y controls.ts (UI del lab), sin framework
+├── experiments/      # mascot-intro.ts + registry.ts (lo que aparece en el selector)
+├── export/           # aspect-presets, captura a video (MediaRecorder), descarga
 ├── svg/
-│   ├── mascot/      # aquí vivirá el SVG de la mascota Tequia (aún no incorporado)
-│   └── utils/       # (vacío) helpers para parsear/consultar SVG
-├── utils/          # (vacío) helpers genéricos (dom, math, timing)
-├── styles/         # CSS global
-└── main.ts         # entry point — smoke test, sin lógica de animación
+│   ├── mascot/        # SVG de la mascota Tequia (versión de trabajo + referencia)
+│   └── utils/         # query-mascot.ts, inline-svg.ts
+├── utils/            # (vacío) helpers genéricos (dom, math, timing)
+├── styles/           # CSS global
+└── main.ts            # orquesta stage + controls + experimentos + export
 ```
 
 La mascota (`src/svg/mascot/`) está deliberadamente desacoplada del
 sistema de animación (`src/animations/`): el SVG no depende de código de
-animación, y el código de animación solo se referirá a las partes del SVG
-por selector (id/clase). Ver
+animación, y el código de animación solo se referirá a sus partes por
+selector (`#HEAD`, `#EYES`, `#MOUTH`, `#EXTRA`, `#MASCOT`). Ver
 [`src/svg/mascot/README.md`](src/svg/mascot/README.md).
 
 ## Cómo ejecutar
 
 ```bash
 npm install       # instalar dependencias
-npm run dev        # servidor de desarrollo con hot reload
+npm run dev        # lab interactivo con hot reload — abrir la URL que imprime Vite
 npm run build       # build de producción (type-check + bundle)
 npm run preview      # sirve el build de producción localmente
 npm run lint        # revisa lint/formato con Biome
 npm run format       # aplica formato con Biome
 ```
 
-Verificado: `npm run build` compila sin errores y `npm run dev` sirve
-correctamente `index.html` con HMR activo.
+En `npm run dev`: elegí un experimento y un formato, reproducí para
+verlo en vivo, y usá **"Descargar video"** para exportar exactamente lo
+que se está reproduciendo en pantalla, en la resolución del formato
+elegido.
 
-## Próximos experimentos (roadmap, no implementado)
+**Verificado en un navegador real** (Chrome headless vía Playwright, no
+solo compilación): la mascota se mueve de verdad durante la reproducción,
+el selector de experimento/formato funciona, y el video exportado es un
+MP4 H.264 válido (confirmado con `ffprobe`) con la resolución y duración
+correctas.
 
-Lista de experimentos previstos, en orden aproximado de complejidad. Nada
-de esto está implementado todavía — es solo la hoja de ruta:
+En consola del navegador, en modo dev, `window.__lab` expone `gsap`,
+`stage` y el `timeline` actual para inspección manual (no existe en el
+build de producción).
 
-1. Cargar el SVG de la mascota en el DOM.
-2. Animación de entrada (aparición inicial).
-3. Animación idle (loop sutil de "estar viva").
-4. Blink (parpadeo).
-5. Bounce.
-6. Cambio de expresiones (ojos/boca).
-7. Animación de accesorios (`EXTRA`).
-8. Morphing de partes (paths).
-9. Timeline compuesta combinando varios de los anteriores.
-10. Adaptaciones para formatos verticales de redes sociales.
-11. Renderizado/exportación de animaciones.
-12. Generación programática de video (candidato: Remotion, requerirá
-    evaluar la introducción de React en un subsistema aislado).
+## Próximos experimentos (roadmap)
 
-## Convenciones para el SVG de la mascota
+Lo que ya existe está tachado; el resto sigue siendo hoja de ruta:
 
-Cuando se incorpore el SVG base de Tequia, se espera que exponga sus
-partes animables como grupos identificables independientes, por ejemplo:
+1. ~~Cargar el SVG de la mascota en el DOM.~~
+2. ~~Animación de entrada.~~
+3. ~~Animación idle.~~
+4. ~~Blink.~~
+5. ~~Bounce.~~
+6. ~~Timeline compuesta combinando varios de los anteriores.~~ (`mascot-intro`)
+7. ~~Adaptaciones para formatos verticales de redes sociales.~~
+8. ~~Renderizado/exportación de animaciones.~~
+9. Cambiar expresiones (variantes de EYES/MOUTH, ver `src/svg/mascot/README.md`).
+10. Animación de accesorios (`EXTRA`).
+11. Morphing de partes (paths) — candidato: `MorphSVGPlugin` de GSAP.
+12. Animación basada en scroll — candidato: `ScrollTrigger` de GSAP.
+13. Generación programática de video más allá de un solo clip (batch,
+    variantes por formato) — candidato: Remotion, si el navegador deja
+    de ser suficiente (ver `src/export/README.md`).
+
+## Convención del SVG de la mascota
+
+Cada capa de la mascota es un grupo identificable, envuelto a su vez en
+un grupo de cuerpo completo:
 
 ```
-<g id="HEAD">...</g>
-<g id="EYES">...</g>
-<g id="MOUTH">...</g>
-<g id="EXTRA">...</g>
+<g id="MASCOT">
+  <g id="HEAD">...</g>
+  <g id="EYES">...</g>
+  <g id="MOUTH">...</g>
+  <g id="EXTRA">...</g>
+</g>
 ```
 
-Esto permitirá animar cada parte por separado sin acoplar el asset al
-código de animación. No se modificará ni rediseñará el SVG en esta etapa.
+Esto permite animar cada parte por separado, o el cuerpo completo
+(`#MASCOT`), sin acoplar el asset al código de animación. Detalle completo
+en [`src/svg/mascot/README.md`](src/svg/mascot/README.md).

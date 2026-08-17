@@ -27,13 +27,65 @@ body {
   opacity: 0.7;
 }
 
-.stage {
-  width: 220px;
+.stage-frame {
+  width: min(70vw, 360px);
+  max-height: 70vh;
   margin: 1.5rem auto;
+  background: #1b1b1f;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
 
-.stage svg {
+.stage-frame__svg {
+  width: 55%;
+}
+
+.stage-frame__svg svg {
   width: 100%;
   height: auto;
   display: block;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: center;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+
+.controls__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+.controls select,
+.controls button {
+  font: inherit;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid #333;
+  background: #1b1b1f;
+  color: inherit;
+}
+
+.controls__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.controls button {
+  cursor: pointer;
+}
+
+.controls button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
