@@ -1,0 +1,145 @@
+<!--
+  MASCOTA TEQUIA — VERSIÓN BASE / NEUTRA (documentada)
+  ======================================================
+  Este archivo es la referencia canónica de cómo está construida la
+  mascota. No se usa en el código (src/icons/mascot.js y
+  src/cinema/mascot-expressions.js tienen sus propias copias del SVG),
+  es solo documentación viva + plantilla para crear nuevas variaciones
+  a mano o en src/cinema/mascot-expressions.js.
+
+  ESTRUCTURA GENERAL
+  ===================
+  La mascota tiene 4 capas, siempre en este orden (de atrás hacia adelante):
+    1. HEAD  -> el polígono "cabeza" (silueta pixel-art con gradiente)
+    2. EYES  -> 1-2 formas oscuras dentro de la cabeza
+    3. MOUTH -> 1 forma oscura dentro de la cabeza
+    4. EXTRA -> accesorio opcional (gorro, chispas, engranaje, etc.),
+                puede salirse de la silueta de la cabeza
+
+  Para crear una expresión nueva solo se reemplazan EYES / MOUTH / EXTRA.
+  El polígono HEAD y el gradiente NUNCA cambian entre expresiones: es lo
+  que mantiene la identidad visual coherente.
+
+  SISTEMA DE COORDENADAS
+  ========================
+  viewBox="10 0 160 130": el lienzo útil va de x=10 a x=170, y=0 a y=130.
+  La cabeza ocupa x=35..145, y=22..117 (ver HEAD_POINTS abajo), así que
+  queda con margen a los 4 lados para accesorios que sobresalgan
+  (gorro por arriba, chispas a los lados, engranaje en una esquina).
+
+  Centro horizontal de la cara: x=90 (mantener simetría en accesorios
+  centrados, aunque ojos/boca pueden romperla para dar personalidad).
+
+  HEAD_POINTS (silueta "corona" pixel-art, 3 puntas arriba + 2 pies abajo,
+  estilo alien de 8 bits):
+    35,41   57,41   57,22   76.8,22  76.8,41  103.2,41
+    103.2,22 123,22 123,41  145,41  145,99.9  125.2,99.9
+    125.2,117 105.4,117 105.4,101.8 74.6,101.8 74.6,117
+    54.8,117 54.8,99.9 35,99.9
+
+  Lectura del patrón en X (de izquierda a derecha):
+    35 -> 57   : punta izquierda (ancho 22)
+    57 -> 76.8 : hueco entre puntas 1 y 2 (ancho 19.8)
+    76.8->103.2: punta central (ancho 26.4, más ancha, queda centrada en 90)
+    103.2->123 : hueco entre puntas 2 y 3 (ancho 19.8)
+    123 -> 145 : punta derecha (ancho 22)
+  En Y: 22 = tope de las puntas · 41 = base de las puntas / techo del
+  cuerpo · 99.9 = piso del cuerpo · 117 = base de los "pies" · 101.8 =
+  techo del hueco entre pies.
+
+  Regla práctica: si quieres una cabeza "hermana" (p. ej. una mascota
+  bebé o una variante más ancha), escala HEAD_POINTS completo desde el
+  centro (90, ~70) en vez de inventar puntos nuevos a mano.
+
+  PALETA DE COLORES
+  ====================
+  Gradiente de la cabeza (identidad, no cambia):
+    0%  -> #c084fc  (violeta claro, esquina superior-izquierda)
+    55% -> #7c3aed  (violeta medio)
+    100%-> #4c1d95  (violeta oscuro, esquina inferior-derecha)
+    linearGradient x1=0% y1=0% x2=100% y2=100% (diagonal)
+  Borde de la cabeza: #c4b5fd, stroke-width 2.5, stroke-linejoin round.
+  Rasgos faciales (ojos/cejas/boca): siempre #09090b (casi negro puro).
+  Acentos usados en accesorios existentes (reutilizar, no inventar
+  colores nuevos salvo que el branding lo pida):
+    #facc15  amarillo -> borla de birrete, chispas de energía
+    #c4b5fd  violeta claro -> chispas/destellos (mismo tono del borde)
+    #a78bfa  violeta medio -> engranaje (modo "building")
+    #1e1b4b / #312e81 -> azul-índigo oscuro, base del birrete
+
+  ZONAS "NEUTRAS" DE OJOS Y BOCA (usadas como default/base en esta
+  versión y reutilizadas tal cual en varias expresiones del código):
+    Ojo izquierdo:  rect x=58 y=67 width=19 height=19
+    Ojo derecho:    rect x=103 y=67 width=19 height=19
+    (mismo y y mismo tamaño -> mirada neutra/simétrica; para variarla
+    se cambia height/y de cada ojo, se rota, o se reemplaza el rect por
+    un rombo/triángulo)
+    Boca neutra: una barra plana y corta, sin curva ni inclinación,
+    centrada en x=90.
+
+  CÓMO AGREGAR UNA EXPRESIÓN NUEVA (receta rápida)
+  =====================================================
+  1. Copiar este archivo o el bloque EYES/MOUTH/EXTRA de abajo.
+  2. Ojos: partir de los rects neutros 19x19 y jugar con:
+     - height (ojo entrecerrado: height más chico, mismo y+altura visual)
+     - transform="rotate(deg cx cy)" (cejas/ojos en ángulo = sorpresa/enojo)
+     - reemplazar rect por forma rotada 45° (rombo) = ojos "brillantes"
+  3. Boca: un rect ancho y bajo = línea seria; rx grande = sonrisa suave;
+     height mayor (>10) = boca abierta/sorpresa.
+  4. Extra (opcional): dibujar SIEMPRE en un <g> aparte para poder
+     quitarlo sin tocar ojos/boca. Puede vivir fuera de la cabeza
+     (x<35, x>145, y<22) sin problema, el viewBox ya tiene margen.
+  5. Si el SVG se va a usar en código (src/cinema/mascot-expressions.js),
+     el polígono HEAD y el <linearGradient> NO se tocan: solo se agrega
+     una entrada nueva al objeto EXPRESSIONS con eyes/mouth/extra.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 160 130" role="img" aria-label="Mascota Tequia — versión base">
+  <defs>
+    <!-- Gradiente de identidad: igual en TODAS las variantes de la mascota -->
+    <linearGradient id="mascot-base-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c084fc" />
+      <stop offset="55%" stop-color="#7c3aed" />
+      <stop offset="100%" stop-color="#4c1d95" />
+    </linearGradient>
+  </defs>
+
+  <!-- 1. HEAD: silueta "corona" pixel-art (ver HEAD_POINTS documentado arriba) -->
+  <polygon
+    points="35,41 57,41 57,22 76.8,22 76.8,41 103.2,41 103.2,22 123,22 123,41 145,41 145,99.9 125.2,99.9 125.2,117 105.4,117 105.4,101.8 74.6,101.8 74.6,117 54.8,117 54.8,99.9 35,99.9"
+    fill="url(#mascot-base-gradient)"
+    stroke="#c4b5fd"
+    stroke-width="2.5"
+    stroke-linejoin="round"
+  />
+
+  <!-- 2. EYES: par neutro, simétrico, cuadrado (bloque base reutilizable) -->
+  <g>
+    <rect x="58" y="67" width="19" height="19" fill="#09090b" />
+    <rect x="103" y="67" width="19" height="19" fill="#09090b" />
+  </g>
+
+  <!-- 3. MOUTH: barra plana centrada en x=90, sin curva -> gesto neutro -->
+  <rect x="74" y="103" width="32" height="5" rx="2.5" fill="#09090b" />
+
+  <!-- 4. EXTRA: vacío en la versión base. Descomentar/adaptar uno de estos
+       bloques de ejemplo (tomados de expresiones existentes) como punto
+       de partida para un accesorio nuevo:
+
+  <!- Ejemplo "chispas" (energetic), van fuera de la cabeza a los lados ->
+  <g fill="#facc15">
+    <rect x="27" y="30" width="8" height="8" transform="rotate(45 31 34)" />
+    <rect x="140" y="26" width="7" height="7" transform="rotate(45 143.5 29.5)" />
+  </g>
+
+  <!- Ejemplo "engranaje" (building), apoyado en la esquina inferior derecha ->
+  <g fill="#a78bfa">
+    <rect x="126" y="94" width="12" height="12" />
+    <rect x="122" y="98" width="4" height="4" />
+    <rect x="138" y="98" width="4" height="4" />
+    <rect x="122" y="90" width="4" height="4" />
+    <rect x="138" y="90" width="4" height="4" />
+    <rect x="130" y="86" width="4" height="4" />
+    <rect x="130" y="106" width="4" height="4" />
+  </g>
+  -->
+</svg>

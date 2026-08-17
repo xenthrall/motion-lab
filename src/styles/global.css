@@ -1,0 +1,39 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: #111;
+  color: #f5f5f5;
+}
+
+#app {
+  text-align: center;
+  padding: 2rem;
+}
+
+#app .status {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.stage {
+  width: 220px;
+  margin: 1.5rem auto;
+}
+
+.stage svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
