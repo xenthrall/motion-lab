@@ -17,14 +17,54 @@ navegador.
   con su resolución de exportación. El mismo preset dimensiona el stage
   en pantalla (`src/components/stage.ts`), así lo que se ve en el
   navegador es lo que se exporta.
+- `file-formats.ts` — los dos formatos de archivo ofrecidos (`mp4`,
+  `webm-transparent`), independientes de la relación de aspecto.
 - `download.ts` — dispara la descarga del Blob resultante.
 
 ## Formato de salida
 
-Se intenta MP4 primero (`MediaRecorder.isTypeSupported`) y se cae a WebM
-si el navegador no lo soporta. Chrome/Edge recientes soportan MP4 nativo
-en `MediaRecorder`; si no, WebM es ampliamente aceptado (la mayoría de
-redes sociales re-codifican el video subido de todas formas).
+Dos opciones, seleccionables en la UI:
+
+- **MP4** (por defecto): se intenta MP4 primero
+  (`MediaRecorder.isTypeSupported`) y se cae a WebM si el navegador no lo
+  soporta. Fondo sólido, listo para subir directo a redes sociales.
+- **WebM transparente**: fuerza `video/webm;codecs=vp9` y **omite** el
+  relleno de fondo del canvas (`ctx.clearRect` en vez de `ctx.fillRect`),
+  así el video queda con canal alfa real — pensado como asset reutilizable
+  (overlay, edición, composición web), no para redes sociales
+  directamente (Instagram/TikTok no aceptan video con transparencia).
+
+### Transparencia: verificado empíricamente, no asumido
+
+Antes de implementar esto se verificó, con una prueba mínima (canvas con
+mitad opaca/mitad transparente → `captureStream` → `MediaRecorder` con
+`vp9` → decodificar el resultado de vuelta a un `<canvas>`), que **Chrome
+preserva el canal alfa de punta a punta** en exactamente este pipeline,
+sin flags ni configuración especial — solo `getContext("2d", {alpha:
+true})` (ya es el default) + `video/webm;codecs=vp9`. Esto evitó sumar
+una dependencia pesada (ffmpeg.wasm) para algo que el navegador ya
+resuelve nativamente.
+
+**Advertencia real encontrada al verificar con la mascota real:**
+`ffmpeg`/`ffprobe` (herramienta de línea de comandos) **no** compone el
+canal alfa de VP9-en-WebM al extraer un frame con las opciones por
+defecto (`ffprobe` reporta `pix_fmt=yuv420p`, sin alfa, y un frame
+extraído con `-frames:v 1 -pix_fmt rgba` sale con alfa=255 en todos
+lados) — a pesar de que el archivo SÍ tiene el canal alfa (ffmpeg hasta
+loggea `alpha_mode: 1` en los metadatos al leerlo). La verificación real
+que importa es decodificar el archivo **en un navegador** (`<video>` +
+`drawImage` a un canvas) — así se confirmó, con el archivo real exportado
+desde la mascota, que la esquina transparente da `[0,0,0,0]` y el cuerpo
+opaco de la mascota da alfa `255`. Si en algún momento se necesita
+inspeccionar/editar estos archivos fuera del navegador (afterEffects,
+ffmpeg con flags específicos, etc.), tener en cuenta que las herramientas
+por defecto pueden mostrar el alfa como si no existiera aunque sí esté
+ahí.
+
+**Compatibilidad:** verificado en Chrome/Chromium. La lectura de WebM con
+alfa VP9 en Firefox/Safari no se probó — el archivo es VP9-alpha-en-WebM
+válido según spec, pero el soporte de decodificación puede variar entre
+navegadores.
 
 ## Cuándo reconsiderar Remotion (o ffmpeg.wasm)
 

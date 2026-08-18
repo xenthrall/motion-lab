@@ -10,17 +10,21 @@ export interface Stage {
   setAspect(preset: AspectPreset): void;
 }
 
+const FRAME_CLASS =
+  "relative mx-auto flex w-full max-w-xs max-h-[70vh] items-center justify-center overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-neutral-900 to-black shadow-2xl shadow-black/40 sm:max-w-sm";
+
 export function createStage(container: Element, svgMarkup: string): Stage {
   const frame = document.createElement("div");
-  frame.className = "stage-frame";
+  frame.className = FRAME_CLASS;
 
   const svgHolder = document.createElement("div");
-  svgHolder.className = "stage-frame__svg";
+  svgHolder.className = "w-[58%]";
   frame.appendChild(svgHolder);
 
   container.appendChild(frame);
 
   const svg = mountInlineSvg(svgHolder, svgMarkup);
+  svg.classList.add("block", "w-full", "h-auto");
   const parts = queryMascotParts(svg);
 
   const setAspect = (preset: AspectPreset) => {

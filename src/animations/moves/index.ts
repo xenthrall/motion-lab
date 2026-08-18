@@ -9,3 +9,18 @@ export type { BlinkOptions } from "./blink";
 
 export { bounce } from "./bounce";
 export type { BounceOptions } from "./bounce";
+
+export { tilt } from "./tilt";
+export type { TiltOptions } from "./tilt";
+
+export { lean } from "./lean";
+export type { LeanOptions } from "./lean";
+
+export { eyesShift } from "./eyes-shift";
+export type { EyesShiftOptions } from "./eyes-shift";
+
+export { widenEyes } from "./widen-eyes";
+export type { WidenEyesOptions } from "./widen-eyes";
+
+export { settle } from "./settle";
+export type { SettleOptions } from "./settle";

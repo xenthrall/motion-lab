@@ -88,6 +88,64 @@ prefirió por:
 - Rendimiento notablemente superior (escrito en Rust).
 - Soporte nativo de TypeScript sin plugins adicionales.
 
+### `tailwindcss` + `@tailwindcss/vite` (dev)
+
+CSS utilitario para la **UI del lab** (el panel donde se previsualiza y
+descarga — stage, pills de experimento/formato, botones, badge de estado).
+Deliberadamente **no** se usa para nada relacionado con la animación de la
+mascota: GSAP sigue escribiendo sus propios estilos inline en tiempo de
+ejecución, y eso no cambia.
+
+- `@tailwindcss/vite` es el plugin oficial de Tailwind v4 para Vite: cero
+  configuración de PostCSS, cero `tailwind.config.js` con `content: []`
+  manual — escanea el grafo de módulos de Vite directamente. Coincide con
+  la prioridad de "configuración sencilla" del proyecto.
+- Tokens de marca (`--color-brand*`) definidos una vez en
+  `src/styles/global.css` vía `@theme`, tomados del propio gradiente de la
+  mascota — así el acento de la UI queda ligado a la identidad visual sin
+  hardcodear hex en cada componente.
+- `global.css` quedó reducido a `@import "tailwindcss"` + esos tokens: el
+  preflight de Tailwind ya cubre el reset que antes se escribía a mano.
+
+**Dónde sigue habiendo CSS puro:** ninguno todavía más allá de las líneas
+de tema — es intencional. Si en el futuro se necesita componer una
+animación más compleja con `@keyframes` CSS (algo que GSAP no cubra bien,
+p. ej. un efecto puramente decorativo de fondo), ese CSS iría en su propio
+archivo dentro de la carpeta del experimento que lo use, nunca mezclado
+con clases de Tailwind de la UI — mismo principio de separación que ya
+regía animaciones (`src/animations/`) vs. UI (`src/components/`).
+
+### `lucide-static` (dev) — iconos de interfaz
+
+Paquete de iconos de trazo (line icons) como archivos `.svg` individuales,
+importados con el mismo patrón `?raw` que ya se usaba para el SVG de la
+mascota — cada icono usado se inlinea como string en el bundle, solo se
+paga el peso de los que realmente se importan (tree-shaking real, no un
+sprite completo).
+
+- Se prefirió sobre el paquete `lucide` (con runtime `createIcons()`)
+  porque no aporta nada aquí: no hay necesidad de reemplazo dinámico de
+  iconos por atributo, y evita cualquier JS de runtime extra.
+- Lucide es el sucesor activamente mantenido de Feather Icons, con un
+  estilo de trazo neutro que combina bien con la paleta violeta de la
+  mascota sin competir visualmente con ella.
+
+### `simple-icons` (dev) — logos de redes sociales
+
+Igual patrón (`?raw`, un archivo `.svg` por marca). Se usa para marcar
+visualmente qué plataformas corresponden a cada preset de formato (p. ej.
+Instagram junto a "1:1 · Feed", TikTok junto a "9:16 · Reels / Stories /
+TikTok").
+
+- Es la fuente canónica de logos de marca en el ecosistema npm: miles de
+  marcas, un solo paquete, sin depender de assets sueltos de dudosa
+  procedencia/licencia por cada red social.
+- Deliberadamente separado de `lucide-static`: uno cubre iconografía
+  genérica de interfaz (trazo, `currentColor`), el otro cubre logos de
+  marca (forma sólida, identidad propia de cada red) — mezclarlos en un
+  solo paquete no tendría sentido, son catálogos con propósitos distintos
+  y ninguno cubre al otro.
+
 ## Descartadas (evaluadas, no instaladas)
 
 ### Motion (antes Framer Motion, paquete `motion`)
@@ -176,6 +234,24 @@ Descartados como combinación en favor de Biome, que cubre el mismo
 resultado (lint + formato) con una sola dependencia y configuración más
 simple. Ver sección "Instaladas".
 
+### DaisyUI / componentes prearmados sobre Tailwind
+
+Se evaluó pero se descartó: la UI del lab es pequeña y a medida (pills,
+stage, badge de estado) — una librería de componentes añadiría una capa de
+clases/convenciones propias encima de Tailwind sin ahorrar trabajo real
+aquí. Reconsiderar solo si la UI crece mucho (formularios complejos,
+modales, tablas).
+
+### Heroicons / Feather / Font Awesome (iconos de interfaz)
+
+Alternativas válidas a Lucide. Heroicons está más atado visualmente a
+Tailwind UI/marca de Tailwind Labs; Feather está prácticamente congelado
+(Lucide es su fork activamente mantenido, con más iconos); Font Awesome
+implica un paquete mucho más pesado y, en su forma gratuita, muchos
+iconos de trazo relevantes solo están en la versión de pago. Lucide gana
+en mantenimiento activo + estilo neutro + tree-shaking real vía
+`lucide-static`.
+
 ### Vitest / testing
 
 No se añade todavía. Esta etapa es de experimentación visual, no de lógica
@@ -186,8 +262,10 @@ la pena testear.
 ## Resumen de la decisión
 
 Un solo motor de animación (`gsap`, gratuito y completo), herramientas de
-desarrollo mínimas y estándar (`vite`, `typescript`, `biome`), y una única
-utilidad de preparación de assets (`svgo`) instalada por adelantado porque
-su necesidad ya es concreta (limpiar el SVG de la mascota antes de
-seccionarlo en partes animables). Todo lo demás queda documentado como
-decisión futura, no como deuda técnica.
+desarrollo mínimas y estándar (`vite`, `typescript`, `biome`), una única
+utilidad de preparación de assets (`svgo`), y para la UI del lab —
+deliberadamente separada de la animación de la mascota— Tailwind v4 vía su
+plugin de Vite más dos paquetes de iconos SVG puros (`lucide-static` para
+interfaz, `simple-icons` para marcas), ambos consumidos con el mismo
+patrón `?raw` que ya usaba el SVG de la mascota. Todo lo demás queda
+documentado como decisión futura, no como deuda técnica.

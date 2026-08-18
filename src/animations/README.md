@@ -39,6 +39,38 @@ Cada archivo en `moves/` exporta una función pura con esta firma:
 | `idleBreathing(parts, { repeat, duration, amount })` | `mascot` | loop sutil de escala ("está viva") |
 | `blink(parts, { times, duration, gap })` | `eyes` | parpadeo (squash vertical) |
 | `bounce(parts, { height, duration })` | `mascot` | salto con squash/stretch |
+| `tilt(parts, { angle, duration })` | `mascot` | inclinación de cabeza (cuerpo completo), gesto de curiosidad |
+| `lean(parts, { x, y, duration })` | `mascot` | se acerca/inclina hacia un punto de la escena |
+| `eyesShift(parts, { x, y, duration })` | `eyes` | desplaza la mirada en una dirección |
+| `widenEyes(parts, { scale, duration })` | `eyes` | ojos bien abiertos (sorpresa/curiosidad) |
+| `settle(parts, { duration })` | `mascot` + `eyes` | vuelve a la postura neutra (posición, rotación, escala) |
+
+`tilt`/`lean` animan `parts.mascot` (no `parts.head`) a propósito: HEAD,
+EYES y MOUTH son grupos hermanos, no anidados — rotar/mover solo HEAD los
+desalinearía. Cualquier gesto de "cuerpo completo" (inclinar, acercarse,
+saltar) siempre debe animar `parts.mascot`.
+
+## Reaccionar a algo en la escena (objetos de utilería)
+
+Cuando una animación necesita que la mascota reaccione a **algo que no es
+parte de ella** (un objeto, una notificación, un ícono), ese "algo" no va
+en el SVG de la mascota ni en un move — se crea como una prop de escena
+genérica con `src/svg/utils/scene-props.ts`:
+
+```ts
+const object = upsertSceneProp(parts.root, "algun-id-estable", "circle", {
+  cx: "152", cy: "18", r: "6", fill: "#facc15", opacity: "0",
+});
+tl.to(object, { opacity: 1, duration: 0.3 }, "+=0.15");
+```
+
+`upsertSceneProp` es idempotente (si ya existe una prop con ese id, la
+reemplaza) y las props quedan marcadas con `data-scene-prop` para que
+`clearSceneProps(root)` pueda limpiarlas al cambiar de experimento — eso
+ya lo hace `main.ts` en `setExperiment()`, no hace falta repetirlo por
+experimento. Ver `src/experiments/mascot-curiosity.ts` como ejemplo
+completo (objeto que aparece, la mascota lo nota, reacciona, y todo
+vuelve a neutro).
 
 ## Componer una animación (un "experimento")
 

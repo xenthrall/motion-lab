@@ -1,4 +1,5 @@
 import type { MascotParts } from "@/svg/utils/query-mascot";
+import { createMascotCuriosityTimeline } from "./mascot-curiosity";
 import { createMascotIntroTimeline } from "./mascot-intro";
 
 export interface ExperimentDefinition {
@@ -19,5 +20,12 @@ export const experiments: ExperimentDefinition[] = [
     label: "Intro (entrada + idle + blink + bounce)",
     description: "Primer experimento compuesto: prueba el kit de moves de punta a punta.",
     create: createMascotIntroTimeline,
+  },
+  {
+    id: "mascot-curiosity",
+    label: "Curiosidad (nota un objeto y reacciona)",
+    description:
+      "La mascota respira, nota un objeto nuevo en escena, lo mira con curiosidad, se acerca y vuelve a su postura neutra.",
+    create: createMascotCuriosityTimeline,
   },
 ];

@@ -1,0 +1,45 @@
+<!--
+  Versión de trabajo de la mascota Tequia (expresión neutra/base).
+  Documentación completa (sistema de coordenadas, paleta, receta de
+  expresiones) en tequia-base.reference.svg — este archivo NO la repite.
+
+  Cambios respecto a la referencia (ambos puramente estructurales, cero
+  cambios visuales — mismos puntos, colores y trazos):
+  1. Cada capa envuelta en <g id="HEAD|EYES|MOUTH|EXTRA">, para poder
+     seleccionar y animar cada parte por separado.
+  2. Las cuatro envueltas a su vez en <g id="MASCOT">, para poder aplicar
+     transforms de cuerpo completo (entrada, bounce, idle) sin depender
+     de transformar el <svg> raíz.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 160 130" role="img" aria-label="Mascota Tequia — versión base">
+  <defs>
+    <linearGradient id="mascot-base-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c084fc" />
+      <stop offset="55%" stop-color="#7c3aed" />
+      <stop offset="100%" stop-color="#4c1d95" />
+    </linearGradient>
+  </defs>
+
+  <g id="MASCOT">
+    <g id="HEAD">
+      <polygon
+        points="35,41 57,41 57,22 76.8,22 76.8,41 103.2,41 103.2,22 123,22 123,41 145,41 145,99.9 125.2,99.9 125.2,117 105.4,117 105.4,101.8 74.6,101.8 74.6,117 54.8,117 54.8,99.9 35,99.9"
+        fill="url(#mascot-base-gradient)"
+        stroke="#c4b5fd"
+        stroke-width="2.5"
+        stroke-linejoin="round"
+      />
+    </g>
+
+    <g id="EYES">
+      <rect x="58" y="67" width="19" height="19" fill="#09090b" />
+      <rect x="103" y="67" width="19" height="19" fill="#09090b" />
+    </g>
+
+    <g id="MOUTH">
+      <rect x="74" y="103" width="32" height="5" rx="2.5" fill="#09090b" />
+    </g>
+
+    <g id="EXTRA"></g>
+  </g>
+</svg>
