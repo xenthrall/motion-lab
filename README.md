@@ -16,14 +16,20 @@ navegador.
 
 Ya hay una base funcional de punta a punta:
 
-- Un **kit de animación** (`src/animations/`) — funciones "move"
-  reutilizables sobre GSAP (entrada, idle, blink, bounce, tilt, lean,
-  mirada, ojos bien abiertos, settle, **cambio de expresión** —forma real
-  de ojos/boca, no solo transform—, giro, tambaleo) que cualquier IA o
-  persona puede componer para generar una animación nueva a partir de un
-  prompt, sin reinventar la estructura. Ver
+- Un **kit de animación** (`src/animations/`) con dos mitades, que
+  cualquier IA o persona puede componer para generar una animación nueva a
+  partir de un prompt sin reinventar la estructura. Ver
   [`src/animations/README.md`](src/animations/README.md).
-- Tres **experimentos reales**, registrados en `src/experiments/registry.ts`:
+  - **Moves** (`moves/`) — animan a la mascota: entrada, idle, blink,
+    bounce, tilt, lean, mirada, ojos bien abiertos, settle, **cambio de
+    expresión** (forma real de ojos/boca, no solo transform), giro,
+    tambaleo, **embestida/esquiva** con estirado, **anticipación**, y
+    **accesorios** que se ponen y se quitan.
+  - **Efectos** (`effects/`) — animan la escena alrededor: fogonazos,
+    ondas expansivas, explosiones de partículas, líneas de velocidad y
+    **sacudida de cámara**. Con aleatoriedad sembrada, para que un render
+    salga idéntico cada vez.
+- Cuatro **experimentos reales**, registrados en `src/experiments/registry.ts`:
   - `mascot-intro` — entrada + idle + blink + bounce.
   - `mascot-curiosity` — la mascota respira, nota un objeto que aparece en
     escena, reacciona con curiosidad (ojos bien abiertos, mirada, cabeza
@@ -37,6 +43,14 @@ Ya hay una base funcional de punta a punta:
     check y un giro, y despega un cohete — con siete expresiones faciales
     distintas y ocho objetos hechos a mano (`src/experiments/mascot-adventure.ts`,
     guion completo documentado ahí).
+  - `mascot-rescue` — **"Código Rojo"**, ~15.7s de cine de acción:
+    producción se cae (sirena roja y un `500` que tapa el cuadro), la
+    mascota entra en pánico, se pone las **gafas de héroe**, esquiva un
+    `404` agachándose y un `null` saltando, contraataca girando mientras
+    los bugs estallan, se enfrenta a un bug gigante y lo revienta con un
+    fogonazo — confeti, `✓ DEPLOYED`, y se le caen las gafas encima del
+    guiño final. Es el experimento que **usa todo el motor a la vez**:
+    moves + efectos de escena + accesorios + capas de profundidad.
 - Un **lab interactivo** (`npm run dev`) con layout de **panel
   administrativo**, responsive (probado en desktop y mobile) y con
   **tema claro/oscuro** (toggle manual, persistido, respeta la
@@ -144,8 +158,12 @@ completo de cada dependencia instalada y las descartadas.
 ```
 src/
 ├── animations/
-│   ├── moves/        # entrance, idleBreathing, blink, bounce, tilt, lean,
-│   │                  # eyesShift, widenEyes, settle (composables)
+│   ├── moves/        # animan a la mascota: entrance, idleBreathing, blink,
+│   │                  # bounce, tilt, lean, eyesShift, widenEyes, settle,
+│   │                  # setExpression, setAccessory, spin, wobble, dash,
+│   │                  # anticipate (composables)
+│   ├── effects/      # animan la escena: flash, shockwave, burst,
+│   │                  # speedLines, cameraShake (+ PRNG sembrado)
 │   └── README.md      # convención para componer/agregar animaciones
 ├── api/              # render-client.ts — cliente tipado de la API + suscripción SSE
 ├── components/       # UI del lab (Tailwind), sin framework:
@@ -153,12 +171,12 @@ src/
 │   │                  #   popover, transport-controls, timeline-bar, status,
 │   │                  #   theme, toggle-group, icons, stage, format-icons,
 │   │                  #   experiment-icons, render-panel, render-card
-├── experiments/      # mascot-intro.ts, mascot-curiosity.ts, mascot-adventure.ts + registry.ts
+├── experiments/      # mascot-intro, -curiosity, -adventure, -rescue + registry.ts
 ├── export/           # aspect-presets, backgrounds, rasterize (compartido), captura en vivo, descarga
 ├── render/           # entry.ts — página headless que maneja el renderer (render.html)
 ├── shared/           # render-api.ts — contrato compartido navegador ↔ backend ↔ CLI
 ├── svg/
-│   ├── mascot/        # SVG de la mascota Tequia (versión de trabajo + referencia)
+│   ├── mascot/        # SVG de la mascota + expressions.ts y accessories.ts
 │   └── utils/         # query-mascot.ts, inline-svg.ts, scene-props.ts
 ├── utils/            # (vacío) helpers genéricos (dom, math, timing)
 ├── styles/           # global.css — solo el import de Tailwind + tokens de tema
@@ -352,7 +370,13 @@ Lo que ya existe está tachado; el resto sigue siendo hoja de ruta:
     descargar y borrar; librería persistente en `renders/`. Con página de
     render headless (`render.html`) en lugar del hook dev-only, así el
     modo producción también puede renderizar.~~
-10. Animación de accesorios (`EXTRA`).
+9g. ~~Capa de **efectos de escena** (`src/animations/effects/`): fogonazo,
+    onda expansiva, partículas, líneas de velocidad y sacudida de cámara,
+    con aleatoriedad sembrada; capas de profundidad (`upsertSceneLayer`).
+    Estrenadas en `mascot-rescue`.~~
+10. ~~Animación de accesorios (`EXTRA`).~~ `setAccessory` +
+    `src/svg/mascot/accessories.ts` — las gafas de héroe de `mascot-rescue`
+    entran cayendo y se caen solas al final.
 11. Morphing de partes (paths) — candidato: `MorphSVGPlugin` de GSAP.
 12. Animación basada en scroll — candidato: `ScrollTrigger` de GSAP.
 13. Generación programática de video más allá de un solo clip (batch,

@@ -47,6 +47,9 @@ Cada archivo en `moves/` exporta una función pura con esta firma:
 | `setExpression(parts, shapes, { pop, duration })` | `eyes` + `mouth` | cambia la **forma** (no solo transform) — ver más abajo |
 | `spin(parts, { rotations, duration })` | `mascot` | giro completo de cuerpo entero (rotación relativa `+=360°`) |
 | `wobble(parts, { cycles, duration, angle })` | `mascot` | tambaleo nervioso/mareado, repetido |
+| `dash(parts, { x, y, duration, stretch, returnBack })` | `mascot` | embestida/esquiva rápida, con estirado en el eje del movimiento |
+| `anticipate(parts, { squash, duration })` | `mascot` | agacharse antes de actuar (deja la pose comprimida) |
+| `setAccessory(parts, accessory, { drop })` | `extra` | pone/quita algo puesto (gafas, etc.) — ver más abajo |
 
 `tilt`/`lean` animan `parts.mascot` (no `parts.head`) a propósito: HEAD,
 EYES y MOUTH son grupos hermanos, no anidados — rotar/mover solo HEAD los
@@ -98,6 +101,69 @@ disimular. Agregar una expresión nueva: sumar una entrada a
 > experimento nuevo) — no hace falta que un experimento se preocupe por
 > esto al componerse, ya está cubierto centralizadamente.
 
+`anticipate` deja la mascota **comprimida a propósito** — es una pose de
+espera, no un gesto cerrado. Lo que venga después (`dash`, `bounce`,
+`spin`, o un `to` que devuelva `scaleX/scaleY` a 1) es lo que la suelta.
+Si se compone sola, la mascota se queda agachada.
+
+## Ponerle cosas encima (accesorios en `#EXTRA`)
+
+`setAccessory` es el hermano de `setExpression` para el grupo `#EXTRA`:
+reemplaza su markup con un preset de `src/svg/mascot/accessories.ts`
+(`none`, `shades`), opcionalmente dejándolo caer desde arriba:
+
+```ts
+tl.add(setAccessory(parts, accessories.shades), "<");
+tl.add(setAccessory(parts, accessories.none, { drop: false }), "+=2");
+```
+
+`#EXTRA` es el último hijo de `#MASCOT`, así que dibuja **sobre** la cara
+— es el sitio para gafas, gorros o insignias, y no para algo que deba
+quedar detrás (eso va en una capa de escena).
+
+> ⚠️ Mismo gotcha que las expresiones: `setAccessory` muta `innerHTML`, y
+> GSAP no puede rebobinar eso. Sin ayuda, un experimento que termina con
+> gafas puestas volvería a arrancar con gafas. Ya está cubierto
+> centralizadamente — `resetVisualState()` en `main.ts` (y su gemelo en
+> `src/render/entry.ts`, para el renderer offline) vacía `#EXTRA` además de
+> restaurar EYES/MOUTH antes de cualquier restart. Verificado dejando
+> loopear `mascot-rescue`: al reiniciar, `#EXTRA` queda vacío.
+
+## Efectos de escena (`effects/`)
+
+Un **move** anima a la mascota; un **efecto** anima *la escena alrededor*.
+Viven en `src/animations/effects/` y tienen su propia firma:
+`(layer, options) => gsap.core.Timeline`, donde `layer` es una capa creada
+con `upsertSceneLayer` (ver abajo).
+
+| Efecto | Qué hace |
+|---|---|
+| `flash(layer, { color, opacity, duration, hold })` | fogonazo a cuadro completo (impacto, sirena) |
+| `shockwave(layer, { x, y, to, rings, color })` | anillo(s) que se expanden desde un punto |
+| `burst(layer, { x, y, count, distance, gravity, spread, angle, colors })` | explosión de partículas / confeti |
+| `speedLines(layer, { count, direction, opacity, coverage })` | rayas horizontales de velocidad |
+| `cameraShake(targets, { intensity, cycles, duration })` | sacude lo que se le pase, como una cámara golpeada |
+
+Reglas propias de los efectos (el detalle completo, en
+`effects/index.ts`):
+
+- Crean sus formas **al construirse el timeline**, no mientras se
+  reproduce, y las dejan invisibles. Crear elementos en pleno playback
+  haría que un scrub cayera en un frame que nunca existió.
+- Todos sus `fromTo` llevan **`immediateRender: false`**. GSAP aplica los
+  valores "from" al *crear* el tween, no al reproducirlo: sin esa bandera,
+  construir el experimento pinta todas las partículas sobre el frame 0.
+  Se encontró exactamente así — el primer render de `mascot-rescue` tenía
+  cuadraditos pegados en la cara durante todo el clip.
+- La aleatoriedad va **sembrada** (`createRandom`), para que un render sea
+  reproducible: todo el renderer offline de este lab existe para ser
+  determinista, y `Math.random()` lo rompería.
+- `cameraShake` es el único que no recibe una capa sino targets sueltos,
+  porque justamente tiene que mover **todo a la vez** (capas + mascota) con
+  los mismos offsets. Ojo: anima `x`/`y`, así que no conviene solaparlo con
+  un move que esté moviendo la mascota en ese instante (`lean`, `dash`) —
+  se pisarían.
+
 ## Reaccionar a algo en la escena (objetos de utilería)
 
 Cuando una animación necesita que la mascota reaccione a **algo que no es
@@ -117,14 +183,28 @@ cohete con aletas), usar `upsertSceneGroup(root, id, innerSvgMarkup)` en
 vez de `upsertSceneProp` — mismo comportamiento idempotente, pero crea un
 `<g>` con markup arbitrario en vez de un único elemento con atributos.
 
-`upsertSceneProp`/`upsertSceneGroup` son idempotentes (si ya existe una
-prop con ese id, la reemplazan) y las props quedan marcadas con
+Para una escena con varios objetos —y sobre todo si va a haber efectos—
+conviene `upsertSceneLayer(root, id, { behind })` en vez de props sueltas:
+devuelve un `<g>` vacío al que se le van agregando formas con
+`appendSceneShape(layer, markup)`. Dos motivos:
+
+- **Profundidad:** con `behind: true` la capa se inserta *antes* de
+  `#MASCOT`, así que dibuja detrás de ella. Sin eso, todo lo que se agrega
+  al root queda por delante. Un experimento típico usa dos capas: fondo
+  (sirena, tinte) y frente (proyectiles, explosiones).
+- **Movimientos de cámara:** con todo dentro de una capa, un solo tween
+  sobre la capa mueve la escena entera sin pelearse con los tweens de cada
+  prop (cada uno anima su propio transform).
+
+`upsertSceneProp`/`upsertSceneGroup`/`upsertSceneLayer` son idempotentes
+(si ya existe una prop con ese id, la reemplazan) y quedan marcadas con
 `data-scene-prop` para que `clearSceneProps(root)` pueda limpiarlas al
 cambiar de experimento — eso ya lo hace `main.ts` en `setExperiment()`,
 no hace falta repetirlo por experimento. Ver
-`src/experiments/mascot-curiosity.ts` (un objeto simple) y
-`src/experiments/mascot-adventure.ts` (varios objetos compuestos, con
-guion completo documentado en el archivo) como ejemplos.
+`src/experiments/mascot-curiosity.ts` (un objeto simple),
+`src/experiments/mascot-adventure.ts` (varios objetos compuestos) y
+`src/experiments/mascot-rescue.ts` (dos capas + efectos + accesorios, el
+más completo) como ejemplos, todos con su guion documentado en el archivo.
 
 ## Componer una animación (un "experimento")
 
@@ -142,6 +222,16 @@ tl.add(bounce(parts), "+=0.2");
 
 Cada experimento se registra en `src/experiments/registry.ts` para que
 aparezca automáticamente en el selector del lab (`npm run dev`).
+
+## Cómo agregar un efecto nuevo
+
+1. Crear `src/animations/effects/nombre.ts` con la firma
+   `(layer, options) => gsap.core.Timeline`, sin pausar.
+2. Crear las formas al construir (con `svgNode`), dejarlas invisibles, y
+   animarlas con `fromTo(..., { immediateRender: false })`.
+3. Usar `createRandom(seed)` para cualquier aleatoriedad.
+4. No tocar nunca la mascota — para eso están los moves.
+5. Exportarlo desde `effects/index.ts`.
 
 ## Cómo agregar un move nuevo
 

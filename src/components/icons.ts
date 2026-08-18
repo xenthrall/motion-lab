@@ -14,6 +14,7 @@ import repeatRaw from "lucide-static/icons/repeat.svg?raw";
 import rocketRaw from "lucide-static/icons/rocket.svg?raw";
 import rotateCcwRaw from "lucide-static/icons/rotate-ccw.svg?raw";
 import serverRaw from "lucide-static/icons/server.svg?raw";
+import sirenRaw from "lucide-static/icons/siren.svg?raw";
 import sparklesRaw from "lucide-static/icons/sparkles.svg?raw";
 import squareRaw from "lucide-static/icons/square.svg?raw";
 import sunRaw from "lucide-static/icons/sun.svg?raw";
@@ -41,6 +42,7 @@ export const ui = {
   sun: sunRaw,
   moon: moonRaw,
   rocket: rocketRaw,
+  siren: sirenRaw,
   // Render manager
   film: filmRaw,
   clapperboard: clapperboardRaw,

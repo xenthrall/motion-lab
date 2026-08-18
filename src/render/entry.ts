@@ -3,6 +3,7 @@ import { ASPECT_PRESETS, getAspectPreset } from "@/export/aspect-presets";
 import { BACKGROUNDS, getBackground } from "@/export/backgrounds";
 import { rasterizeSvgToCanvas } from "@/export/rasterize";
 import type { RenderPageApi, RenderPlan, RenderRequest } from "@/shared/render-api";
+import { accessories } from "@/svg/mascot/accessories";
 import { expressions } from "@/svg/mascot/expressions";
 import mascotSvg from "@/svg/mascot/tequia-base.svg?raw";
 import { mountInlineSvg } from "@/svg/utils/inline-svg";
@@ -64,9 +65,10 @@ let plan: RenderPlan | null = null;
  * it, two renders in a row on the same page would start with whatever face
  * the previous one ended on. */
 function resetVisualState(): void {
-  gsap.set([parts.mascot, parts.eyes], { clearProps: "all" });
+  gsap.set([parts.mascot, parts.eyes, parts.extra], { clearProps: "all" });
   parts.eyes.innerHTML = expressions.neutral.eyes;
   parts.mouth.innerHTML = expressions.neutral.mouth;
+  parts.extra.innerHTML = accessories.none.markup;
 }
 
 function findOrThrow<T extends { id: string }>(items: T[], id: string, kind: string): T {

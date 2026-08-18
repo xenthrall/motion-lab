@@ -15,6 +15,7 @@ import { BACKGROUNDS, DEFAULT_BACKGROUND_ID, getBackground } from "@/export/back
 import { recordSvgAnimation } from "@/export/capture";
 import { downloadBlob } from "@/export/download";
 import type { RenderRequest } from "@/shared/render-api";
+import { accessories } from "@/svg/mascot/accessories";
 import { expressions } from "@/svg/mascot/expressions";
 import mascotSvg from "@/svg/mascot/tequia-base.svg?raw";
 import { clearSceneProps } from "@/svg/utils/scene-props";
@@ -95,14 +96,17 @@ function resetVisualState(): void {
   // a freshly created, not-yet-played timeline can leave the mascot stuck
   // looking invisible/mid-pose for an instant. Reset right after creating
   // a timeline so nothing weird flashes before playback kicks in.
-  gsap.set([stage.parts.mascot, stage.parts.eyes], { clearProps: "all" });
-  // setExpression swaps EYES/MOUTH innerHTML directly — GSAP has no notion
-  // of an "end state" to rewind for that, so without this, restarting (or
-  // looping) an experiment that changes expression would start every
-  // replay still wearing whatever face it ended on (e.g. mascot-adventure
-  // looping back in still smiling from its "happy" ending).
+  gsap.set([stage.parts.mascot, stage.parts.eyes, stage.parts.extra], { clearProps: "all" });
+  // setExpression/setAccessory swap EYES/MOUTH/EXTRA innerHTML directly —
+  // GSAP has no notion of an "end state" to rewind for that, so without
+  // this, restarting (or looping) an experiment that changes expression
+  // would start every replay still wearing whatever face it ended on (e.g.
+  // mascot-adventure looping back in still smiling from its "happy"
+  // ending), and mascot-rescue would loop back in still wearing the hero
+  // shades it just dropped.
   stage.parts.eyes.innerHTML = expressions.neutral.eyes;
   stage.parts.mouth.innerHTML = expressions.neutral.mouth;
+  stage.parts.extra.innerHTML = accessories.none.markup;
 }
 
 let currentAspectId = DEFAULT_ASPECT_ID;

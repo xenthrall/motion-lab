@@ -31,6 +31,27 @@ Duplicar `tequia-base.svg`, mantener `HEAD` y el `<linearGradient>` tal
 cual, y reemplazar el contenido de `EYES` / `MOUTH` / `EXTRA` siguiendo la
 receta documentada en `tequia-base.reference.svg`.
 
+En la práctica, las variantes que usa el lab no son archivos SVG sueltos
+sino markup con nombre, que se inyecta en esos grupos en tiempo de
+ejecución:
+
+- **`expressions.ts`** — pares de `EYES`/`MOUTH` (`neutral`, `surprised`,
+  `happy`, `starstruck`, `dizzy`, `determined`, `wink`, `angry`, `panic`).
+- **`accessories.ts`** — markup para `EXTRA`, cosas que la mascota *lleva
+  puestas* (`none`, `shades`). `EXTRA` es el último hijo de `MASCOT`, así
+  que dibuja **sobre** la cara: sirve para gafas, gorros o insignias, y no
+  para algo que deba quedar detrás (eso va en una capa de escena, ver
+  `src/svg/utils/scene-props.ts`).
+
+Los moves `setExpression` / `setAccessory` son los que hacen el
+intercambio. Ambos son cortes instantáneos, no morphs — ver
+`src/animations/README.md`.
+
+Regla que se mantiene en los dos casos: **`HEAD` y el gradiente nunca
+cambian**. Un detalle práctico que salió de ahí: las gafas no son negras,
+porque los ojos ya lo son y una lente negra sobre un ojo negro se lee como
+un agujero en la cara.
+
 ## Nota para cuando haya varias instancias en la misma página
 
 El `<linearGradient id="mascot-base-gradient">` usa un id fijo. Mientras

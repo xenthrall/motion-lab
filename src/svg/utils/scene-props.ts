@@ -43,6 +43,49 @@ export function upsertSceneGroup(root: SVGSVGElement, id: string, innerSvg: stri
   return g;
 }
 
+/**
+ * An empty group to mount a whole scene into, instead of appending props
+ * one by one to the root.
+ *
+ * Two reasons it exists. **Depth:** props appended to the root always draw
+ * *over* the mascot; `behind: true` inserts the layer before `#MASCOT`, so
+ * an experiment can have a background (flashes, speed lines) and a
+ * foreground (explosions, projectiles). **Camera moves:** with every prop
+ * inside one group, a single tween on the group moves/shakes the entire
+ * scene at once, without fighting the per-prop tweens that the story is
+ * already running (each animates its own transform).
+ */
+export function upsertSceneLayer(
+  root: SVGSVGElement,
+  id: string,
+  options: { behind?: boolean } = {},
+): SVGGElement {
+  root.querySelector(`[data-scene-prop="${id}"]`)?.remove();
+
+  const layer = document.createElementNS(SVG_NS, "g") as SVGGElement;
+  layer.dataset.sceneProp = id;
+
+  const mascot = root.querySelector("#MASCOT");
+  if (options.behind && mascot) {
+    root.insertBefore(layer, mascot);
+  } else {
+    root.appendChild(layer);
+  }
+  return layer;
+}
+
+/**
+ * Adds one shape group inside a layer. Not marked with `data-scene-prop`
+ * itself — it doesn't need to be, since clearing the layer takes its
+ * children with it.
+ */
+export function appendSceneShape(layer: SVGGElement, innerSvg: string): SVGGElement {
+  const g = document.createElementNS(SVG_NS, "g") as SVGGElement;
+  g.innerHTML = innerSvg;
+  layer.appendChild(g);
+  return g;
+}
+
 /** Removes every scene prop under `root` — call before switching experiments. */
 export function clearSceneProps(root: SVGSVGElement): void {
   for (const el of root.querySelectorAll("[data-scene-prop]")) {

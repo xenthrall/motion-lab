@@ -44,6 +44,17 @@ export const expressions = {
     eyes: `<path d="M58 80 Q67.5 65 77 80" stroke="${INK}" stroke-width="6" stroke-linecap="round" fill="none" /><rect x="103" y="67" width="19" height="19" fill="${INK}" />`,
     mouth: `<path d="M70 99 Q90 121 110 99 Q90 113 70 99 Z" fill="${INK}" />`,
   },
+  /** Battle face — angled brows over narrowed eyes, teeth bared. `determined`
+   * is "concentrated"; this is a step past it, for a fight. */
+  angry: {
+    eyes: `<path d="M56 66 L79 74 L79 84 L56 78 Z" fill="${INK}" /><path d="M124 66 L101 74 L101 84 L124 78 Z" fill="${INK}" />`,
+    mouth: `<path d="M72 100 L108 100 L102 111 L78 111 Z" fill="${INK}" /><path d="M74.5 102 L105.5 102 L104 105 L76 105 Z" fill="#fafafa" />`,
+  },
+  /** Full panic — pinprick pupils in wide whites, wobbling open mouth. */
+  panic: {
+    eyes: `<circle cx="67.5" cy="77" r="13" fill="#fafafa" stroke="${INK}" stroke-width="2.5" /><circle cx="112.5" cy="77" r="13" fill="#fafafa" stroke="${INK}" stroke-width="2.5" /><circle cx="67.5" cy="78" r="4.5" fill="${INK}" /><circle cx="112.5" cy="78" r="4.5" fill="${INK}" />`,
+    mouth: `<ellipse cx="90" cy="107" rx="11" ry="8" fill="${INK}" /><path d="M81 104 Q85 108 90 104 Q95 100 99 104" stroke="#fafafa" stroke-width="2" fill="none" stroke-linecap="round" />`,
+  },
 } satisfies Record<string, ExpressionShapes>;
 
 export type ExpressionName = keyof typeof expressions;

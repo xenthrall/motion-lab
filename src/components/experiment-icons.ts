@@ -11,6 +11,7 @@ const EXPERIMENT_ICONS: Record<string, string> = {
   "mascot-intro": ui.sparkles,
   "mascot-curiosity": ui.eye,
   "mascot-adventure": ui.rocket,
+  "mascot-rescue": ui.siren,
 };
 
 export function experimentIcon(id: string): string {

@@ -28,8 +28,17 @@ export type { SettleOptions } from "./settle";
 export { setExpression } from "./set-expression";
 export type { SetExpressionOptions } from "./set-expression";
 
+export { setAccessory } from "./set-accessory";
+export type { SetAccessoryOptions } from "./set-accessory";
+
 export { spin } from "./spin";
 export type { SpinOptions } from "./spin";
 
 export { wobble } from "./wobble";
 export type { WobbleOptions } from "./wobble";
+
+export { dash } from "./dash";
+export type { DashOptions } from "./dash";
+
+export { anticipate } from "./anticipate";
+export type { AnticipateOptions } from "./anticipate";
