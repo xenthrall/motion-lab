@@ -7,8 +7,18 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "ignore": ["dist", "node_modules"]
+    "ignore": ["dist", "node_modules", "renders"]
   },
+  "overrides": [
+    {
+      "include": ["tsconfig.*.json"],
+      "json": {
+        "parser": {
+          "allowComments": true
+        }
+      }
+    }
+  ],
   "formatter": {
     "enabled": true,
     "indentStyle": "space",

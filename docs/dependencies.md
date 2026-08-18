@@ -149,7 +149,7 @@ TikTok").
 ### `playwright` (dev)
 
 Automatiza un navegador Chromium real desde Node — usada exclusivamente
-por `scripts/render.mjs`, el renderizador offline (ver
+por el renderizador offline `server/render/engine.ts` (ver
 `src/export/README.md`). No toca la app en sí (el bundle que ve el
 usuario no la incluye, ni siquiera de forma tree-shakeable — es un
 devDependency que solo corre en un script de Node).
@@ -175,15 +175,57 @@ devDependency que solo corre en un script de Node).
 - **Por qué no Remotion:** Remotion resolvería el mismo problema, pero
   **es** una capa sobre React — segundo motivo (junto con el pipeline de
   renderizado) por el que se había descartado hasta ahora (ver
-  "Descartadas" más abajo). `scripts/render.mjs` logra exactamente lo
-  mismo (renderizado determinista frame-por-frame) reutilizando el 100%
-  del código de animación existente (GSAP + los propios experimentos),
-  sin introducir React ni una capa de composición nueva.
+  "Descartadas" más abajo). `server/render/engine.ts` logra exactamente
+  lo mismo (renderizado determinista frame-por-frame) reutilizando el
+  100% del código de animación existente (GSAP + los propios
+  experimentos), sin introducir React ni una capa de composición nueva.
+
+### `hono` + `@hono/node-server` (dev)
+
+El framework HTTP del backend de renders (`server/`, ver
+[`server/README.md`](../server/README.md)). Dos paquetes chicos, sin
+dependencias transitivas propias, con tipos de TypeScript de primera.
+
+- **Por qué hacía falta un backend:** disparar un render offline desde el
+  navegador, ver su progreso, y después descargarlo o borrarlo, requiere
+  un proceso de larga vida con acceso al sistema de archivos: Playwright y
+  `ffmpeg` no corren dentro de una pestaña. La alternativa (seguir usando
+  solo la CLI) funcionaba, pero obligaba a saltar a la terminal para todo
+  lo que no fuera previsualizar.
+- **Por qué Hono y no Express/Fastify:** la API son ~8 rutas. Hono da
+  ruteo tipado, SSE (`hono/streaming`) y servido de estáticos sin sumar
+  el árbol de dependencias de Express ni el andamiaje de esquemas de
+  Fastify. Además su API está basada en `Request`/`Response` estándar,
+  que es lo mismo que usa el resto del código moderno del proyecto
+  (`fetch` en el cliente), así que no hay dos modelos mentales.
+- **Por qué no cero dependencias (`node:http` a mano):** se evaluó
+  seriamente, porque el proyecto tiene la costumbre de no sumar paquetes
+  por comodidad. Serían ~150 líneas propias de ruteo, parseo de JSON,
+  SSE y servido de archivos con soporte de `Range` — código de
+  infraestructura sin relación con animación, que habría que mantener y
+  testear. Hono lo resuelve con dos paquetes minúsculos. Lo único que sí
+  quedó escrito a mano es la ruta que sirve el video, porque necesitaba
+  control fino de `Range` y de `Content-Disposition`.
+
+### TypeScript ejecutado directo por Node (sin `tsx` ni `ts-node`)
+
+No es una dependencia — es la ausencia de una, y vale documentarla. Node
+22.18+ hace *type stripping* nativo, así que `server/` y `scripts/` están
+escritos en TypeScript y se ejecutan con `node server/main.ts`, sin
+bundler, sin loader y sin artefactos de build.
+
+El costo es que solo se puede usar sintaxis *borrable*: nada de `enum`,
+`namespace`, propiedades de parámetros ni decoradores, y los imports
+relativos llevan la extensión `.ts` explícita. Eso está garantizado por
+`tsconfig.server.json`, que activa `erasableSyntaxOnly` y
+`verbatimModuleSyntax` — sin esas dos banderas, un error de tipos podría
+convertirse en un error de ejecución. `npm run typecheck` revisa frontend
+y backend por separado.
 
 ### `@clack/prompts` (dev)
 
 CLI interactiva (flechas + enter, confirmaciones, spinners) para
-`scripts/render.mjs` — permite elegir experimento/aspecto/fondo/fps sin
+`scripts/render.ts` — permite elegir experimento/aspecto/fondo/fps sin
 tener que recordar ni escribir los ids de memoria en cada invocación.
 
 - **Por qué esta y no otra:** es de la misma familia que ya se usa
@@ -202,10 +244,62 @@ tener que recordar ni escribir los ids de memoria en cada invocación.
   stdin, sigue siendo seguro invocarlo desde un script o CI (ver
   `src/export/README.md`).
 - **No se usa en la app** (`src/`) en absoluto — vive solo en
-  `scripts/render.mjs`, un devDependency que no afecta el bundle de
+  `scripts/render.ts`, un devDependency que no afecta el bundle de
   producción.
 
 ## Descartadas (evaluadas, no instaladas)
+
+### Next.js (y frameworks de aplicación en general)
+
+Evaluado explícitamente al construir el backend de renders, y descartado.
+Es la decisión de arquitectura más importante de esa etapa, así que va el
+razonamiento completo.
+
+**Lo que Next.js aporta y este proyecto no usa:** renderizado en
+servidor, React Server Components, ruteo por archivos, optimización de
+imágenes, SEO, despliegue en edge/serverless. Esta herramienta es local y
+de un solo usuario: se abre en `localhost`, no se indexa, no tiene
+usuarios concurrentes ni rutas más allá de dos vistas, y su "contenido"
+es un SVG animado por GSAP sobre el DOM. Ninguna de esas capacidades
+tiene dónde aplicarse.
+
+**Lo que costaría:** Next.js *es* React. Migrar significa reescribir los
+~15 componentes de `src/components/` (sidebar, galería, toolbar,
+popover, transporte, línea de tiempo, panel de renders) que hoy
+funcionan, están documentados y no tienen deuda. Es trabajo grande con
+cero ganancia funcional.
+
+**Y el punto decisivo:** la parte difícil de esta función no es servir
+HTML, es **ejecutar trabajos largos con progreso en vivo**. Un render de
+`mascot-adventure` son ~577 frames y varios minutos de Playwright +
+`ffmpeg`. Los route handlers de Next.js son de petición/respuesta y están
+pensados para entornos serverless: para esto haría falta igual un proceso
+worker aparte y un almacén de trabajos. Es decir, se pagaría el impuesto
+de React **y** habría que construir la cola de todos modos. La cola es
+justamente lo que se construyó (`server/queue.ts`, ~200 líneas), sobre un
+proceso Node normal que ya puede tener a Chromium y a `ffmpeg` vivos.
+
+**Revisar de nuevo si** el laboratorio deja de ser local y de un solo
+usuario: varias personas renderizando contra un servidor compartido,
+autenticación, o una UI que crezca hasta necesitar ruteo real y estado
+compartido complejo. Nada de eso está sobre la mesa hoy.
+
+### Redis / BullMQ / una base de datos para la cola
+
+La cola vive en memoria y los trabajos terminados se espejan en
+`renders/library.json`. Un job store persistente permitiría sobrevivir a
+un reinicio a mitad de render, pero eso no significa nada acá: si el
+proceso muere, el render a medias muere con él y hay que rehacerlo igual.
+Sumar un servicio externo (o un archivo de base de datos) para no ganar
+nada sería peso operativo puro.
+
+**Reconsiderar si** aparecen renders programados/desatendidos que deban
+sobrevivir al ciclo de vida del proceso.
+
+### `tsx` / `ts-node` para el backend
+
+Innecesarios: Node 22.18+ ejecuta TypeScript directamente (ver arriba).
+Una dependencia menos y un paso de arranque menos.
 
 ### Motion (antes Framer Motion, paquete `motion`)
 
@@ -257,13 +351,13 @@ React) — un costo que no se justificaba sin una necesidad concreta.
 
 Esa necesidad concreta llegó (exportación determinista, sin lag, para
 animaciones pesadas — ver `playwright` más arriba y
-`src/export/README.md`), pero se resolvió **sin** Remotion: un script de
-~200 líneas (`scripts/render.mjs`) con Playwright + `ffmpeg` logra el
-mismo renderizado frame-por-frame reutilizando directamente el código de
-animación existente. No hay nada que Remotion aportara aquí que
-justificara sumar React — el "pipeline de renderizado" que antes se
-mencionaba como motivo adicional para descartarlo ya no aplica, se
-construyó y es liviano.
+`src/export/README.md`), pero se resolvió **sin** Remotion: un motor de
+~200 líneas (`server/render/engine.ts`) con Playwright + `ffmpeg` logra
+el mismo renderizado frame-por-frame reutilizando directamente el código
+de animación existente, y lo usan por igual la CLI y el backend. No hay
+nada que Remotion aportara aquí que justificara sumar React — el
+"pipeline de renderizado" que antes se mencionaba como motivo adicional
+para descartarlo ya no aplica, se construyó y es liviano.
 
 **Revisar de nuevo si** en algún momento se necesita algo que Remotion
 resuelve y un script simple no: renderizado paralelo/distribuido,
@@ -273,7 +367,7 @@ integración con un pipeline de CI para generar variantes en batch.
 ### `ffmpeg-static`
 
 Empaqueta un binario de `ffmpeg` precompilado y lo descarga en el
-`postinstall`, evitando que quien use `scripts/render.mjs` necesite
+`postinstall`, evitando que quien use el renderizador offline necesite
 instalar `ffmpeg` por su cuenta. Se descartó por ahora: el binario agrega
 ~50-80MB a **todo** `npm install` del proyecto, para todo el mundo,
 aunque nunca vayan a usar el renderer offline — un costo alto para un
@@ -305,9 +399,9 @@ cambio de paradigma sin beneficio inmediato.
 
 El motivo original para reconsiderarlo era "si se aborda exportación de
 video con Remotion" — ya se abordó exportación de video determinista
-(`scripts/render.mjs`), pero sin Remotion (ver esa sección más abajo), así
-que ese disparador ya no aplica. Sigue sin haber necesidad concreta de
-React en ningún punto del laboratorio.
+(`server/render/engine.ts`), pero sin Remotion (ver esa sección más
+abajo), así que ese disparador ya no aplica. Sigue sin haber necesidad
+concreta de React en ningún punto del laboratorio.
 
 ### ESLint + Prettier
 
@@ -350,10 +444,16 @@ plugin de Vite más dos paquetes de iconos SVG puros (`lucide-static` para
 interfaz, `simple-icons` para marcas), ambos consumidos con el mismo
 patrón `?raw` que ya usaba el SVG de la mascota.
 
-La exportación de video tiene dos capas, cada una con su propio
+La exportación de video tiene tres capas, cada una con su propio
 presupuesto de dependencias: la vía en vivo sigue en cero dependencias
-nuevas (solo `canvas` + `MediaRecorder` del navegador), y la vía offline
+nuevas (solo `canvas` + `MediaRecorder` del navegador); la vía offline
 suma `playwright` — evaluada frente a la alternativa obvia (Remotion) y
 preferida por no requerir React, reutilizando en cambio el código de
-animación que ya existía. Todo lo demás queda documentado como decisión
-futura, no como deuda técnica.
+animación que ya existía; y la gestión de renders desde la interfaz suma
+`hono` + `@hono/node-server`, evaluados frente a Next.js (descartado por
+no aportar nada a una herramienta local de un solo usuario, y por no
+resolver la parte difícil: los trabajos largos) y frente a escribir el
+servidor con `node:http` a mano.
+
+El backend no suma runtime de TypeScript: Node lo ejecuta directo. Todo
+lo demás queda documentado como decisión futura, no como deuda técnica.

@@ -67,22 +67,31 @@ Ya hay una base funcional de punta a punta:
   La exportación en vivo (botón "Descargar" en la UI) usa únicamente
   `canvas` + `MediaRecorder` nativos del navegador — cero dependencias
   nuevas.
-- **Renderizador offline** (`npm run render`, `scripts/render.mjs`) —
-  para cuando la exportación en vivo pierde frames en animaciones
-  largas/pesadas. Reproduce el mismo timeline de GSAP en un navegador
-  headless, pero pausado y avanzado frame por frame (sin presupuesto de
-  tiempo real), y lo codifica con `ffmpeg`. Más lento que la exportación
-  en vivo, pero **nunca pierde un frame** sin importar cuán compleja sea
-  la animación — verificado con "La aventura del código" completa
-  (577/577 frames exactos). **CLI interactiva** (`@clack/prompts`):
-  navegá con flechas + enter cualquier valor (experimento/aspecto/fondo/
-  fps) que no se haya pasado por flag; con las cuatro flags (o `--yes`)
-  corre sin tocar stdin, seguro para scripts/CI. Requiere `playwright`
-  (dev) + `ffmpeg` instalado en el sistema.
+- **Renderizador offline determinista** — para cuando la exportación en
+  vivo pierde frames en animaciones largas/pesadas. Reproduce el mismo
+  timeline de GSAP en un navegador headless, pero pausado y avanzado
+  frame por frame (sin presupuesto de tiempo real), y lo codifica con
+  `ffmpeg`. Más lento que la exportación en vivo, pero **nunca pierde un
+  frame** sin importar cuán compleja sea la animación — verificado con
+  "La aventura del código" completa (577/577 frames exactos).
+- **Gestión completa de renders desde la app** (backend propio,
+  [`server/`](server/README.md)) — la barra lateral tiene una vista
+  **Renders** donde se encola un render, se ve su **progreso en vivo**
+  (etapa + frame actual, por SSE), se cancela a mitad de camino, y
+  quedan los terminados en una **librería** con reproductor, descarga y
+  borrado. El botón **"Render HD"** del toolbar encola directamente lo
+  que estás viendo. Si el backend no está corriendo, la app sigue
+  funcionando y el panel lo dice en vez de fallar.
+- **CLI** (`npm run render`) — el mismo motor para un render suelto desde
+  la terminal, con selección interactiva (flechas + enter) de lo que no
+  se haya pasado por flag; con todas las flags (o `--yes`) no toca stdin,
+  seguro para scripts/CI.
 
   Ver [`src/export/README.md`](src/export/README.md) para el detalle
   técnico de la transparencia, de cómo agregar un fondo nuevo, y de
-  cuándo usar cada vía de exportación.
+  cuándo usar cada vía de exportación; y
+  [`server/README.md`](server/README.md) para la cola, la API y por qué
+  no se migró a Next.js.
 
 Sigue habiendo mucho roadmap por delante (expresiones, morphing,
 timelines más orgánicas) — ver [Próximos experimentos](#próximos-experimentos-roadmap).
@@ -106,19 +115,29 @@ timelines más orgánicas) — ver [Próximos experimentos](#próximos-experimen
 - **lucide-static** / **simple-icons** (dev) — iconos SVG puros (interfaz
   y logos de redes sociales respectivamente), importados con `?raw`, el
   mismo patrón que ya se usaba para el SVG de la mascota.
-- **Playwright** (dev) — solo para `scripts/render.mjs` (renderizador
-  offline), no toca la app. Automatiza Chromium para reproducir el
-  timeline frame por frame sin las restricciones de tiempo real de la
-  exportación en vivo.
+- **Playwright** (dev) — solo para el renderizador offline, no toca la
+  app. Automatiza Chromium para reproducir el timeline frame por frame
+  sin las restricciones de tiempo real de la exportación en vivo.
+- **Hono** + **@hono/node-server** (dev) — el backend de renders
+  (`server/`). Dos paquetes chicos, sin dependencias transitivas, para
+  ~8 rutas HTTP + SSE.
+- **TypeScript ejecutado directo por Node** — el backend y los scripts
+  están en `.ts` y corren con `node server/main.ts`: Node 22.18+ borra
+  los tipos por su cuenta, así que no hay bundler, ni `tsx`, ni paso de
+  build para el servidor.
 - **npm** — gestor de paquetes.
 
 Exportación en vivo con `canvas` + `MediaRecorder` nativos del navegador
 — cero dependencias nuevas ahí. Remotion se evaluó específicamente para
 el renderizador offline y se descartó por requerir React sin necesidad
-real (ver `docs/dependencies.md` y `src/export/README.md`). Sin
-frameworks de UI de aplicación (React, Vue, etc.) en el laboratorio en
-sí. Ver [`docs/dependencies.md`](docs/dependencies.md) para el
-razonamiento completo de cada dependencia instalada y las descartadas.
+real. **Next.js se evaluó para el backend y también se descartó**: aporta
+SSR/ruteo/React que una herramienta local de un solo usuario no necesita,
+implicaría reescribir toda la UI que ya funciona, y no resuelve la parte
+difícil (trabajos largos con progreso — sus route handlers son de
+petición/respuesta, haría falta un worker aparte igual). Sin frameworks
+de UI de aplicación (React, Vue, etc.) en el laboratorio en sí. Ver
+[`docs/dependencies.md`](docs/dependencies.md) para el razonamiento
+completo de cada dependencia instalada y las descartadas.
 
 ## Estructura
 
@@ -128,22 +147,37 @@ src/
 │   ├── moves/        # entrance, idleBreathing, blink, bounce, tilt, lean,
 │   │                  # eyesShift, widenEyes, settle (composables)
 │   └── README.md      # convención para componer/agregar animaciones
+├── api/              # render-client.ts — cliente tipado de la API + suscripción SSE
 ├── components/       # UI del lab (Tailwind), sin framework:
 │   │                  #   sidebar, experiment-gallery, toolbar, option-picker,
 │   │                  #   popover, transport-controls, timeline-bar, status,
 │   │                  #   theme, toggle-group, icons, stage, format-icons,
-│   │                  #   experiment-icons
+│   │                  #   experiment-icons, render-panel, render-card
 ├── experiments/      # mascot-intro.ts, mascot-curiosity.ts, mascot-adventure.ts + registry.ts
 ├── export/           # aspect-presets, backgrounds, rasterize (compartido), captura en vivo, descarga
+├── render/           # entry.ts — página headless que maneja el renderer (render.html)
+├── shared/           # render-api.ts — contrato compartido navegador ↔ backend ↔ CLI
 ├── svg/
 │   ├── mascot/        # SVG de la mascota Tequia (versión de trabajo + referencia)
 │   └── utils/         # query-mascot.ts, inline-svg.ts, scene-props.ts
 ├── utils/            # (vacío) helpers genéricos (dom, math, timing)
 ├── styles/           # global.css — solo el import de Tailwind + tokens de tema
-└── main.ts            # orquesta stage + controls + experimentos + export
+└── main.ts            # orquesta stage + controls + experimentos + export + panel de renders
+
+server/               # backend de renders (TypeScript, ejecutado directo por Node)
+├── main.ts            #   arranque y modos dev/prod
+├── app.ts             #   rutas HTTP (Hono) + SSE + estáticos
+├── queue.ts           #   cola de trabajos: crear, correr, cancelar, borrar
+├── library.ts         #   renders/ + manifiesto library.json
+├── render/            #   engine.ts (motor determinista), browser.ts, ffmpeg.ts
+└── README.md          #   arquitectura, API y decisiones (incluida la de Next.js)
 
 scripts/
-└── render.mjs         # renderizador offline determinista (npm run render)
+├── dev.ts             # levanta Vite + API juntos (npm run dev)
+└── render.ts          # CLI del renderizador offline (npm run render)
+
+index.html             # la app
+render.html            # página headless de render (segunda entrada del build)
 ```
 
 La mascota (`src/svg/mascot/`) está deliberadamente desacoplada del
@@ -155,18 +189,26 @@ selector (`#HEAD`, `#EYES`, `#MOUTH`, `#EXTRA`, `#MASCOT`). Ver
 ## Cómo ejecutar
 
 ```bash
-npm install       # instalar dependencias
-npm run dev        # lab interactivo con hot reload — abrir la URL que imprime Vite
-npm run build       # build de producción (type-check + bundle)
-npm run preview      # sirve el build de producción localmente
+npm install                        # instalar dependencias
+npx playwright install chromium    # una sola vez, para el renderizador offline
+
+npm run dev        # lab + backend de renders juntos — abrir http://localhost:5173
+npm run build       # build de producción (type-check de app y servidor + bundle)
+npm start           # un solo proceso: sirve el build y la API — http://localhost:5174
+npm run typecheck    # tsc sobre frontend y backend
 npm run lint        # revisa lint/formato con Biome
 npm run format       # aplica formato con Biome
 
-npx playwright install chromium   # una sola vez, para el renderizador offline
+# render offline desde la terminal (alternativa al panel de Renders de la app)
 npm run render                     # interactivo: flechas + enter para elegir experimento/aspecto/fondo/fps
 npm run render -- --list           # ver experimentos/aspectos/fondos disponibles
 npm run render -- --experiment=mascot-adventure --aspect=vertical --background=midnight --fps=30 --yes
 ```
+
+`npm run dev` levanta dos procesos (Vite en 5173, API en 5174) y los baja
+juntos; Vite hace proxy de `/api`, así que el navegador ve un solo
+origen. `npm run dev:app` levanta solo el frontend: la app funciona
+igual, pero el panel de Renders avisa que la API no está disponible.
 
 En `npm run dev`: elegí un experimento en la galería del sidebar (arranca
 en bucle al instante), ajustá relación de aspecto/fondo desde los
@@ -174,8 +216,10 @@ popovers del toolbar, reproducí/pausá/arrastrá la línea de tiempo o
 desactivá el bucle, y usá **"Descargar"** para exportar exactamente lo
 que se está reproduciendo en pantalla — instantáneo, ideal para previews.
 Si una animación larga/pesada se ve con lag en el video descargado, usá
-`npm run render` en su lugar: más lento, pero frame-perfecto sin importar
-la complejidad (requiere `ffmpeg` instalado en el sistema).
+**"Render HD"** (o la vista **Renders** del sidebar): encola un render
+offline frame-perfecto, con progreso en vivo, y lo deja en una librería
+donde podés reproducirlo, descargarlo o borrarlo (requiere `ffmpeg`
+instalado en el sistema).
 
 **Verificado en un navegador real** (Chrome headless vía Playwright, no
 solo compilación): autoplay + bucle al seleccionar un experimento
@@ -219,22 +263,59 @@ corrigieron dos bugs reales:
   19.23s + 2.5s del siguiente y verificando que la boca vuelve a ser la
   neutra, no la "happy" del cierre anterior.
 
-**Renderizador offline** (`npm run render`): antes de construirlo se
-investigaron optimizaciones a la exportación en vivo — `createImageBitmap`
-para rasterizar el SVG falló directamente (0 bytes de salida, confirmado
-que es un problema del navegador/entorno y no de nuestro SVG probando con
-un `<rect>` trivial, revertido antes de llegar a ningún lado), y las otras
+**Renderizador offline**: antes de construirlo se investigaron
+optimizaciones a la exportación en vivo — `createImageBitmap` para
+rasterizar el SVG falló directamente (0 bytes de salida, confirmado que es
+un problema del navegador/entorno y no de nuestro SVG probando con un
+`<rect>` trivial, revertido antes de llegar a ningún lado), y las otras
 dos alternativas medidas (Blob URL, reutilizar el `Image`) no mejoraron
 nada — así que el fix real era eliminar la restricción de tiempo real, no
-optimizarla. El script completo se probó con `mascot-adventure` (la
-animación más pesada): 577/577 frames exactos (confirmado con `ffprobe`,
-sin huecos), y el fondo transparente exportado por esta vía también se
-decodificó en el navegador para confirmar canal alfa real, igual que la
-vía en vivo.
+optimizarla. Se probó con `mascot-adventure` (la animación más pesada):
+577/577 frames exactos (confirmado con `ffprobe`, sin huecos), y el fondo
+transparente exportado por esta vía también se decodificó en el navegador
+para confirmar canal alfa real, igual que la vía en vivo.
+
+**Backend y panel de renders** — verificado ejercitando la API y la UI
+reales, no solo compilando:
+
+- Ciclo completo desde el navegador: encolar con "Render HD", ver el
+  progreso avanzar (`Preparando el navegador…` → `Frame 26 / 111`),
+  cancelar a mitad, encolar desde el formulario, esperar a que termine,
+  reproducir el video en la tarjeta, y borrarlo — sin un solo error de
+  consola.
+- **Cola serializada**: con dos trabajos encolados, uno queda `running` y
+  el otro `queued`, y arranca solo cuando el primero libera.
+- **Cancelar cancela de verdad**: interrumpido en el frame 60 de 577, el
+  trabajo queda `cancelled`, sin error, y **no deja archivo parcial** en
+  `renders/`.
+- **Persistencia**: la librería sobrevive al reinicio del proceso
+  (`renders/library.json`), y borrar desde la UI elimina el registro y el
+  archivo.
+- **Streaming de video**: `Range` responde `206 Partial Content` (para
+  que el `<video>` pueda buscar sin bajar todo) y `?download=1` fuerza
+  `Content-Disposition: attachment`.
+- **Transparencia también por esta vía**: el WebM se decodificó **en un
+  navegador real** a través del proxy — esquina `[0,0,0,0]`, mascota
+  opaca `[133,68,239,255]`.
+- **Validación**: falta un campo → `400` con mensaje legible; fps fuera de
+  rango → `400`; id de experimento inexistente → el trabajo queda
+  `failed` con `Unknown experiment "no-existe". Available: ...`.
+- **Sin backend corriendo** (solo Vite): la app funciona igual, "Descargar"
+  (captura en vivo) sigue habilitado, y el panel muestra "API no
+  disponible" con los botones de render deshabilitados y un tooltip que
+  dice qué hacer.
+- **Modo producción**: `npm start` (un solo proceso) sirve la app y
+  renderiza **contra su propio build** — 145/145 frames de
+  `mascot-curiosity` en 4:5. Esto es lo que el viejo hook dev-only no
+  podía hacer.
+- Tema claro/oscuro y layout mobile (390px, sin overflow horizontal)
+  verificados también en la vista de Renders.
 
 En consola del navegador, en modo dev, `window.__lab` expone `gsap`,
-`stage`, el `timeline` actual, y (`window.__lab.render`) el hook que usa
-`scripts/render.mjs` — nada de esto existe en el build de producción.
+`stage` y el `timeline` actual para inspección — nada de eso existe en el
+build de producción. El renderer **ya no depende de ese hook**: usa
+`/render.html`, una entrada real del build con su propio contrato
+(`src/shared/render-api.ts`).
 
 ## Próximos experimentos (roadmap)
 
@@ -266,13 +347,18 @@ Lo que ya existe está tachado; el resto sigue siendo hoja de ruta:
     vivo — sin Remotion/React, con Playwright + ffmpeg.~~
 9e. ~~CLI interactiva para el renderizador offline (flechas + enter vía
     `@clack/prompts`), con flags opcionales para uso scriptable/CI.~~
+9f. ~~Backend propio (`server/`) y gestión completa de renders desde la
+    app: encolar, progreso en vivo por SSE, cancelar, reproducir,
+    descargar y borrar; librería persistente en `renders/`. Con página de
+    render headless (`render.html`) en lugar del hook dev-only, así el
+    modo producción también puede renderizar.~~
 10. Animación de accesorios (`EXTRA`).
 11. Morphing de partes (paths) — candidato: `MorphSVGPlugin` de GSAP.
 12. Animación basada en scroll — candidato: `ScrollTrigger` de GSAP.
 13. Generación programática de video más allá de un solo clip (batch,
-    variantes por formato) — el renderizador offline (`scripts/render.mjs`)
-    ya cubre un clip a la vez; batch sería iterarlo por combinación de
-    experimento/aspecto/fondo, sin necesitar nada nuevo.
+    variantes por formato) — la cola ya acepta varios trabajos seguidos y
+    los corre en orden, así que batch sería encolar por combinación de
+    experimento/aspecto/fondo, sin necesitar nada nuevo del motor.
 
 ## Convención del SVG de la mascota
 

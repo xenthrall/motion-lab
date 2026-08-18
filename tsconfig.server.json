@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    // DOM is needed even though this is Node code: Playwright's page.evaluate
+    // callbacks run in the browser, and src/shared/render-api.ts augments
+    // `Window` with the render page's API.
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"],
+    "noEmit": true,
+    // Node runs these .ts files directly via native type stripping, so the
+    // import specifiers it sees must be the real ones, extension included.
+    "allowImportingTsExtensions": true,
+    // The two settings that keep "type-checked TypeScript" and "what Node can
+    // actually execute" the same thing: verbatimModuleSyntax forces type-only
+    // imports to say so (the stripper cannot infer it), and erasableSyntaxOnly
+    // rejects enums, namespaces, parameter properties and decorators — the TS
+    // features that would need real codegen. Without these, a type error would
+    // become a runtime crash.
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "skipLibCheck": true
+  },
+  "include": ["server", "scripts", "src/shared"]
+}

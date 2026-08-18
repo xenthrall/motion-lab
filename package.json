@@ -5,13 +5,17 @@
   "description": "Laboratorio experimental de animacion SVG/DOM para la mascota de Tequia y futuros experimentos de motion design.",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "node scripts/dev.ts",
+    "dev:app": "vite",
+    "dev:api": "node server/main.ts",
+    "build": "npm run typecheck && vite build",
+    "start": "node server/main.ts --static",
+    "typecheck": "tsc -b tsconfig.json tsconfig.server.json",
     "preview": "vite preview",
     "lint": "biome check .",
     "format": "biome format --write .",
     "svg:optimize": "svgo -f src/svg/mascot -o src/svg/mascot",
-    "render": "node scripts/render.mjs"
+    "render": "node scripts/render.ts"
   },
   "dependencies": {
     "gsap": "^3.13.0"
@@ -19,8 +23,10 @@
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "@clack/prompts": "^1.7.0",
+    "@hono/node-server": "^2.1.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^22.10.2",
+    "hono": "^4.13.2",
     "lucide-static": "^1.31.0",
     "playwright": "^1.62.1",
     "simple-icons": "^16.28.0",

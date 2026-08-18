@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Motion Lab — render worker</title>
+    <!--
+      Headless render target. Nobody is meant to open this page by hand: it
+      is loaded by Playwright (server/render/engine.ts and scripts/render.ts)
+      to drive the animation frame by frame. No stylesheet, no lab UI — just
+      the mascot and the render API. See src/render/entry.ts.
+    -->
+    <style>
+      body {
+        margin: 0;
+        background: transparent;
+      }
+      /* Fixed, layout-independent box. The rasterizer works off the SVG's
+         viewBox, not its on-screen size, so this only needs to be stable —
+         never a source of per-run variation. */
+      #render-root {
+        width: 400px;
+      }
+      #render-root svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="render-root"></div>
+    <script type="module" src="/src/render/entry.ts"></script>
+  </body>
+</html>

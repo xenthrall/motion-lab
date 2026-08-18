@@ -6,10 +6,17 @@ más abajo para cuándo usar cada una):
 
 - **En vivo, en el navegador** (`capture.ts`) — instantáneo, el botón
   "Descargar" de la UI. Cero dependencias nuevas.
-- **Offline, determinista** (`scripts/render.mjs`, raíz del proyecto) —
-  `npm run render`, corre en Node vía un navegador headless + `ffmpeg`.
-  Tarda más, pero nunca pierde un frame sin importar cuán pesada sea la
-  animación.
+- **Offline, determinista** — el mismo motor
+  (`server/render/engine.ts`) con dos formas de invocarlo:
+  - el **panel de Renders** de la app (botón "Render HD" o el formulario),
+    que encola el trabajo en el backend y muestra el progreso en vivo;
+  - la **CLI** `npm run render`, para un render suelto desde la terminal.
+
+  Tarda más que la captura en vivo, pero nunca pierde un frame sin
+  importar cuán pesada sea la animación.
+
+La arquitectura del backend (cola, librería en disco, API) está en
+[`server/README.md`](../../server/README.md).
 
 ## Exportación en vivo (`capture.ts`)
 
@@ -20,9 +27,11 @@ más abajo para cuándo usar cada una):
   renderizador determinista frame-por-frame.
 - `rasterize.ts` — la función que convierte el estado actual del SVG en
   píxeles sobre un canvas (letterboxed al tamaño destino). La comparte
-  `capture.ts` (llamada en cada frame) **y** `scripts/render.mjs` (vía el
-  hook `window.__lab.render`, solo en modo dev) — una sola implementación
-  para las dos vías de exportación.
+  `capture.ts` (llamada en cada frame) **y** la página de render
+  headless (`src/render/entry.ts`, que maneja el renderer offline) — una
+  sola implementación para las dos vías de exportación, así lo que se
+  descarga en vivo y lo que sale del render offline son los mismos
+  píxeles.
 - `aspect-presets.ts` — formatos soportados (cuadrado, 4:5, 9:16, 16:9)
   con su resolución de exportación. El mismo preset dimensiona el stage
   en pantalla (`src/components/stage.ts`), así lo que se ve en el
@@ -109,7 +118,26 @@ alfa VP9 en Firefox/Safari no se probó — el archivo es VP9-alpha-en-WebM
 válido según spec, pero el soporte de decodificación puede variar entre
 navegadores.
 
-## Renderizado offline (`scripts/render.mjs`)
+## Renderizado offline
+
+Dos formas de disparar el **mismo** motor (`server/render/engine.ts`):
+
+### Desde la app (panel de Renders)
+
+`npm run dev` levanta el lab y el backend juntos. En la barra lateral,
+**Renders**:
+
+- **"Render HD"** en el toolbar del laboratorio encola lo que estás
+  viendo (experimento + aspecto + fondo actuales) y salta al panel.
+- El formulario del panel permite elegir cualquier combinación y los fps.
+- Los trabajos en curso muestran barra de progreso, frame actual y botón
+  de cancelar; los terminados quedan en la librería con reproductor,
+  descarga y borrado.
+
+Ver [`server/README.md`](../../server/README.md) para la cola, la
+persistencia y la API.
+
+### Desde la terminal (CLI)
 
 ```
 npm run render                                                                     # interactivo: flechas + enter para todo lo que falte
@@ -124,9 +152,21 @@ enter, `Esc`/`Ctrl+C` cancela limpio). Al final solo se muestra una
 confirmación si **al menos un valor** salió de un prompt — un run con las
 cuatro flags (o con `--yes`) nunca toca stdin, así sigue siendo seguro de
 invocar desde un script o CI. Verificado en ambos extremos: con las
-cuatro flags corre de punta a punta sin bloquear (~21s para `mascot-intro`
-completo), y con solo `--experiment` se detiene a preguntar exactamente
-lo que falta (aspecto/fondo/fps) y muestra la confirmación al final.
+cuatro flags corre de punta a punta sin bloquear, y con solo
+`--experiment` se detiene a preguntar exactamente lo que falta
+(aspecto/fondo/fps) y muestra la confirmación al final.
+
+La CLI levanta su propio dev server de Vite, así que funciona sin
+`npm run dev` corriendo. A diferencia del panel, escribe siempre al mismo
+nombre de archivo (`experimento-aspecto-fondo.mp4`): un comando suelto
+re-ejecutado debería reemplazar su propia salida, no acumular copias. El
+backend, en cambio, agrega un sufijo único porque ahí el objetivo es
+justamente mantener una librería.
+
+**Ojo:** los renders hechos por la CLI quedan en `renders/` pero **no
+aparecen en el panel**, porque no se registran en `library.json` (ver
+["Límite conocido"](../../server/README.md#límite-conocido-la-cli-no-entra-en-la-librería)).
+Para renders que quieras administrar desde la app, usá el panel.
 
 ### Por qué existe
 
@@ -158,26 +198,34 @@ la restricción de tiempo real — de ahí este script.
 
 ### Cómo funciona
 
-Abre un navegador headless (Playwright) contra un dev server de Vite
-levantado por el propio script, selecciona el experimento/aspecto/fondo
-haciendo click en la UI real (los mismos elementos que usaría una
-persona), y por cada frame:
+Playwright abre **`/render.html`** — una segunda entrada de Vite, sin
+interfaz, que solo monta la mascota y expone `window.motionLabRender`
+(ver `src/render/entry.ts`). Por cada frame:
 
 ```js
-window.__lab.timeline.pause();
-window.__lab.timeline.time(t, false); // seek exacto, sin suppressEvents — ver src/animations/README.md
-await window.__lab.render.rasterizeSvgToCanvas(svg, ctx, settings); // mismo código que capture.ts
+api.seek(t);              // timeline.time(t, false) — seek exacto, sin suppressEvents
+await api.captureFrame(); // usa rasterizeSvgToCanvas, el mismo código que capture.ts
 ```
 
 No hay presupuesto de tiempo por frame: si rasterizar tarda 5ms o 500ms,
 el resultado es idéntico, porque cada frame se captura de forma
-determinista y se guarda como PNG. Al final, `ffmpeg` codifica la
-secuencia con ajustes que ninguna captura en vivo podría usar (`-preset
-slow`, `-crf 15`) porque el tiempo de codificación ya no importa.
-`mascot-adventure` completo (577 frames, 1080x1080) tardó
-~95s en total — más lento que verlo en vivo, pero **577/577 frames
-exactos**, confirmado con `ffprobe` (duración = frames/fps exacto, sin
-huecos).
+determinista. Los PNG se escriben **directo al stdin de `ffmpeg`**
+(`-f image2pipe`), que codifica con ajustes que ninguna captura en vivo
+podría usar (`-preset slow`, `-crf 15`) porque el tiempo de codificación
+ya no importa. `mascot-adventure` completo (577 frames, 1080x1080) da
+**577/577 frames exactos**, confirmado con `ffprobe` (duración =
+frames/fps exacto, sin huecos).
+
+Antes el renderer manejaba la app real por un hook dev-only
+(`window.__lab`). La página aparte es mejor por tres razones: existe en
+el build de producción (así `npm start` puede renderizar sin un dev
+server), es un contrato estable en vez de un hook de depuración (la
+interfaz de la app se puede refactorizar sin romper renders), y carga
+más rápido en el navegador headless porque no hay UI que construir.
+Escribir a `ffmpeg` por stdin, en vez de a un directorio temporal de
+PNGs numerados, elimina el temporal (nada que limpiar si el proceso
+muere), evita escribir y releer cientos de MB, y solapa la codificación
+con la captura.
 
 ### Costos
 
@@ -190,15 +238,17 @@ huecos).
   ahora: sumaría ~50-80MB a **todo** `npm install`, incluso para quien
   nunca use el renderer, cuando `ffmpeg` del sistema es un requisito
   común y de una sola instalación).
-- Es una herramienta de línea de comandos, no un botón en el navegador —
-  conviven ambas vías a propósito, ver más abajo.
+- Necesita un proceso Node corriendo (el backend, o la CLI que levanta el
+  suyo) — no es algo que el navegador pueda hacer solo. Por eso conviven
+  ambas vías a propósito, ver más abajo.
 
 ## Exportación en vivo vs. renderizado offline
 
-| | En vivo (`capture.ts`) | Offline (`scripts/render.mjs`) |
+| | En vivo (`capture.ts`) | Offline (motor + backend/CLI) |
 |---|---|---|
 | Cuándo usar | Preview rápido, publicar ya | Clips largos/pesados, calidad final |
 | Velocidad | Instantáneo (dura lo que dura el clip) | Más lento (frame por frame + encode) |
 | Frames perdidos | Posible en clips pesados | Nunca — determinista |
 | Calidad de encode | La que da `MediaRecorder` en tiempo real | Configurable, sin límite de tiempo (`-crf 15 -preset slow`) |
 | Dependencias | Ninguna (solo el navegador) | `playwright` + `ffmpeg` del sistema |
+| Dónde queda | Descarga directa del navegador | Librería en `renders/`, gestionable desde la app |

@@ -9,9 +9,10 @@ export interface RasterizeOptions {
  * Draws the SVG's *current* state onto `ctx`, letterboxed to fit
  * width x height. Shared by the live real-time exporter (capture.ts,
  * called every requestAnimationFrame) and the offline frame-by-frame
- * renderer (scripts/render.mjs, called once per stepped frame via the
- * dev-only window.__lab hook) — one implementation of "how do we turn
- * the mascot's current DOM state into pixels", reused by both.
+ * renderer (via the headless render page, src/render/entry.ts, called
+ * once per stepped frame) — one implementation of "how do we turn the
+ * mascot's current DOM state into pixels", reused by both, so a live
+ * download and an offline render produce the same pixels.
  */
 export function rasterizeSvgToCanvas(
   svg: SVGSVGElement,

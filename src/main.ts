@@ -1,6 +1,8 @@
+import { renderApi, subscribeToRenderEvents } from "@/api/render-client";
 import { ASPECT_ICONS } from "@/components/format-icons";
 import { brandIcon, colorSwatch, transparencySwatch, ui, uiIcon } from "@/components/icons";
-import { createSidebar } from "@/components/sidebar";
+import { createRenderPanel } from "@/components/render-panel";
+import { type LabView, createSidebar } from "@/components/sidebar";
 import { createStage } from "@/components/stage";
 import { createStatus } from "@/components/status";
 import { type Theme, applyTheme, getInitialTheme } from "@/components/theme";
@@ -12,7 +14,7 @@ import { ASPECT_PRESETS, DEFAULT_ASPECT_ID, getAspectPreset } from "@/export/asp
 import { BACKGROUNDS, DEFAULT_BACKGROUND_ID, getBackground } from "@/export/backgrounds";
 import { recordSvgAnimation } from "@/export/capture";
 import { downloadBlob } from "@/export/download";
-import { rasterizeSvgToCanvas } from "@/export/rasterize";
+import type { RenderRequest } from "@/shared/render-api";
 import { expressions } from "@/svg/mascot/expressions";
 import mascotSvg from "@/svg/mascot/tequia-base.svg?raw";
 import { clearSceneProps } from "@/svg/utils/scene-props";
@@ -38,12 +40,15 @@ app.innerHTML = `
       id="sidebar-container"
       class="w-full border-b border-line bg-surface md:sticky md:top-0 md:h-screen md:w-64 md:shrink-0 md:overflow-y-auto md:border-b-0 md:border-r"
     ></aside>
-    <main class="flex flex-1 flex-col items-center gap-5 px-4 py-6 sm:px-8 sm:py-10">
-      <div id="toolbar-container" class="w-full max-w-md"></div>
-      <div id="stage-container" class="w-full"></div>
-      <div id="timeline-bar-container" class="w-full max-w-md"></div>
-      <div id="transport-container"></div>
-      <div id="status-container"></div>
+    <main class="flex flex-1 flex-col px-4 py-6 sm:px-8 sm:py-10">
+      <div id="lab-view" class="flex flex-col items-center gap-5">
+        <div id="toolbar-container" class="w-full max-w-md"></div>
+        <div id="stage-container" class="w-full"></div>
+        <div id="timeline-bar-container" class="w-full max-w-md"></div>
+        <div id="transport-container"></div>
+        <div id="status-container"></div>
+      </div>
+      <div id="renders-view" class="hidden"></div>
     </main>
   </div>
 `;
@@ -54,13 +59,17 @@ const stageContainer = app.querySelector<HTMLDivElement>("#stage-container");
 const timelineBarContainer = app.querySelector<HTMLDivElement>("#timeline-bar-container");
 const transportContainer = app.querySelector<HTMLDivElement>("#transport-container");
 const statusContainer = app.querySelector<HTMLDivElement>("#status-container");
+const labView = app.querySelector<HTMLDivElement>("#lab-view");
+const rendersView = app.querySelector<HTMLDivElement>("#renders-view");
 if (
   !sidebarContainer ||
   !toolbarContainer ||
   !stageContainer ||
   !timelineBarContainer ||
   !transportContainer ||
-  !statusContainer
+  !statusContainer ||
+  !labView ||
+  !rendersView
 ) {
   throw new Error("main: expected layout elements were not found");
 }
@@ -131,6 +140,7 @@ function setExperiment(id: string): void {
   currentExperimentId = definition.id;
   timeline = definition.create(stage.parts);
   wireTimeline();
+  syncRenderForm();
   void playFromStart();
 }
 
@@ -166,15 +176,32 @@ const sidebar = createSidebar(
       setExperiment(id);
       const label = experiments.find((experiment) => experiment.id === id)?.label ?? id;
       status.set(label, "idle");
+      // Picking an experiment is a "show me this animation" gesture, so it
+      // also brings the preview back into view from the Renders panel.
+      setView("lab");
     },
     onThemeToggle() {
       currentTheme = currentTheme === "dark" ? "light" : "dark";
       applyTheme(currentTheme);
       sidebar.setTheme(currentTheme);
     },
+    onViewChange(view) {
+      setView(view);
+    },
   },
 );
 sidebar.setTheme(currentTheme);
+
+/** Swaps the main panel between the animation lab and the render manager.
+ * An arrow function rather than a `function` declaration on purpose: a
+ * hoisted declaration would lose the non-null narrowing the layout check
+ * above established on the view containers. */
+const setView = (view: LabView): void => {
+  labView.classList.toggle("hidden", view !== "lab");
+  labView.classList.toggle("flex", view === "lab");
+  rendersView.classList.toggle("hidden", view !== "renders");
+  sidebar.setView(view);
+};
 
 const aspectItems = ASPECT_PRESETS.map((preset) => {
   const icons = ASPECT_ICONS[preset.id];
@@ -200,10 +227,23 @@ const toolbar = createToolbar(toolbarContainer, aspectItems, backgroundItems, {
   onAspectChange(id) {
     currentAspectId = id;
     stage.setAspect(getAspectPreset(id));
+    syncRenderForm();
   },
   onBackgroundChange(id) {
     currentBackgroundId = id;
     stage.setBackground(getBackground(id));
+    syncRenderForm();
+  },
+  onRender() {
+    // "Render what I'm looking at": the Lab's current setup, at whatever fps
+    // the Renders form is set to.
+    void queueRender({
+      experimentId: currentExperimentId,
+      aspectId: currentAspectId,
+      backgroundId: currentBackgroundId,
+      fps: renderPanel.getRequest().fps,
+    });
+    setView("renders");
   },
   async onExport() {
     const aspect = getAspectPreset(currentAspectId);
@@ -255,6 +295,101 @@ const transport = createTransportControls(transportContainer, {
   },
 });
 
+// --- Render manager (offline renders, handled by the Node backend) --------
+
+const renderPanel = createRenderPanel(
+  rendersView,
+  {
+    experiments: experiments.map(({ id, label, description }) => ({
+      id,
+      label,
+      hint: description,
+    })),
+    aspects: ASPECT_PRESETS.map(({ id, label }) => ({ id, label })),
+    backgrounds: BACKGROUNDS.map(({ id, label }) => ({ id, label })),
+  },
+  {
+    onQueue(request) {
+      void queueRender(request);
+    },
+    onCancel(id) {
+      void renderApi.cancel(id).catch((error: Error) => {
+        status.set(`No se pudo cancelar: ${error.message}`, "error");
+      });
+    },
+    onDelete(id) {
+      void renderApi.remove(id).catch((error: Error) => {
+        status.set(`No se pudo borrar: ${error.message}`, "error");
+      });
+    },
+  },
+);
+
+/** Keeps the "new render" form showing whatever the Lab is currently
+ * previewing, so queueing a render of it is one click with nothing to re-pick. */
+function syncRenderForm(): void {
+  renderPanel.setSelection({
+    experimentId: currentExperimentId,
+    aspectId: currentAspectId,
+    backgroundId: currentBackgroundId,
+  });
+}
+
+let backendOnline = false;
+let ffmpegAvailable = false;
+
+function reflectBackendState(): void {
+  renderPanel.setConnection({ online: backendOnline, ffmpeg: ffmpegAvailable });
+  toolbar.setRenderEnabled(
+    backendOnline && ffmpegAvailable,
+    backendOnline
+      ? "Falta ffmpeg en el sistema — instalalo para poder renderizar"
+      : "El backend de render no está disponible (arrancá con `npm run dev`)",
+  );
+}
+
+async function refreshHealth(): Promise<void> {
+  try {
+    const health = await renderApi.health();
+    backendOnline = health.ok;
+    ffmpegAvailable = health.ffmpeg;
+  } catch {
+    // Expected when only Vite is running (`npm run dev:app`): the panel says
+    // so and disables queueing instead of failing on the first click.
+    backendOnline = false;
+    ffmpegAvailable = false;
+  }
+  reflectBackendState();
+}
+
+async function queueRender(request: RenderRequest): Promise<void> {
+  try {
+    await renderApi.create(request);
+    status.set("Render encolado", "idle");
+  } catch (error) {
+    status.set(`No se pudo encolar el render: ${(error as Error).message}`, "error");
+  }
+}
+
+subscribeToRenderEvents({
+  onEvent(event) {
+    renderPanel.applyEvent(event);
+    sidebar.setRenderBadge(renderPanel.activeCount());
+  },
+  onConnectionChange(online) {
+    const wasOffline = !backendOnline;
+    backendOnline = online;
+    // Coming back online is also the moment to re-check ffmpeg — the server
+    // may have been restarted with a different environment.
+    if (online && wasOffline) void refreshHealth();
+    else reflectBackendState();
+  },
+});
+
+void refreshHealth();
+syncRenderForm();
+setView("lab");
+
 wireTimeline();
 status.set(`gsap ${gsap.version} · listo`, "idle");
 void playFromStart();
@@ -265,46 +400,6 @@ if (import.meta.env.DEV) {
     stage,
     get timeline() {
       return timeline;
-    },
-    // --- offline renderer support (scripts/render.mjs drives these) ---
-    // Never touched by the interactive UI — kept separate from the rest
-    // of this hook so it's obvious what's "just for poking around in
-    // devtools" vs. "an actual API another program depends on".
-    render: {
-      rasterizeSvgToCanvas,
-      listExperiments: () =>
-        experiments.map(({ id, label, description }) => ({ id, label, description })),
-      listAspects: () =>
-        ASPECT_PRESETS.map(({ id, label, width, height }) => ({
-          id,
-          label,
-          hint: `${width}x${height}`,
-        })),
-      listBackgrounds: () =>
-        BACKGROUNDS.map(({ id, label, kind, color }) => ({
-          id,
-          label,
-          hint: kind === "transparent" ? "canal alfa, asset reutilizable" : (color ?? ""),
-        })),
-      selectExperiment: (id: string) => setExperiment(id),
-      selectAspect: (id: string) => {
-        currentAspectId = id;
-        stage.setAspect(getAspectPreset(id));
-      },
-      selectBackground: (id: string) => {
-        currentBackgroundId = id;
-        stage.setBackground(getBackground(id));
-      },
-      getExportSettings: () => {
-        const aspect = getAspectPreset(currentAspectId);
-        const background = getBackground(currentBackgroundId);
-        return {
-          width: aspect.width,
-          height: aspect.height,
-          transparent: background.kind === "transparent",
-          backgroundColor: background.color ?? "#000000",
-        };
-      },
     },
   };
 }

@@ -1,6 +1,9 @@
 import chevronDownRaw from "lucide-static/icons/chevron-down.svg?raw";
+import checkRaw from "lucide-static/icons/circle-check.svg?raw";
+import clapperboardRaw from "lucide-static/icons/clapperboard.svg?raw";
 import downloadRaw from "lucide-static/icons/download.svg?raw";
 import eyeRaw from "lucide-static/icons/eye.svg?raw";
+import filmRaw from "lucide-static/icons/film.svg?raw";
 import loaderRaw from "lucide-static/icons/loader-2.svg?raw";
 import moonRaw from "lucide-static/icons/moon.svg?raw";
 import pauseRaw from "lucide-static/icons/pause.svg?raw";
@@ -10,9 +13,13 @@ import rectangleVerticalRaw from "lucide-static/icons/rectangle-vertical.svg?raw
 import repeatRaw from "lucide-static/icons/repeat.svg?raw";
 import rocketRaw from "lucide-static/icons/rocket.svg?raw";
 import rotateCcwRaw from "lucide-static/icons/rotate-ccw.svg?raw";
+import serverRaw from "lucide-static/icons/server.svg?raw";
 import sparklesRaw from "lucide-static/icons/sparkles.svg?raw";
 import squareRaw from "lucide-static/icons/square.svg?raw";
 import sunRaw from "lucide-static/icons/sun.svg?raw";
+import trashRaw from "lucide-static/icons/trash-2.svg?raw";
+import alertRaw from "lucide-static/icons/triangle-alert.svg?raw";
+import closeRaw from "lucide-static/icons/x.svg?raw";
 import instagramRaw from "simple-icons/icons/instagram.svg?raw";
 import tiktokRaw from "simple-icons/icons/tiktok.svg?raw";
 import youtubeRaw from "simple-icons/icons/youtube.svg?raw";
@@ -34,6 +41,14 @@ export const ui = {
   sun: sunRaw,
   moon: moonRaw,
   rocket: rocketRaw,
+  // Render manager
+  film: filmRaw,
+  clapperboard: clapperboardRaw,
+  trash: trashRaw,
+  close: closeRaw,
+  alert: alertRaw,
+  check: checkRaw,
+  server: serverRaw,
 } as const;
 
 /** Solid brand/social icons (simple-icons) — no fill set, need one injected. */
