@@ -10,6 +10,7 @@ import { ui } from "./icons";
 const EXPERIMENT_ICONS: Record<string, string> = {
   "mascot-intro": ui.sparkles,
   "mascot-curiosity": ui.eye,
+  "mascot-adventure": ui.rocket,
 };
 
 export function experimentIcon(id: string): string {

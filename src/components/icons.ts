@@ -1,7 +1,6 @@
 import chevronDownRaw from "lucide-static/icons/chevron-down.svg?raw";
 import downloadRaw from "lucide-static/icons/download.svg?raw";
 import eyeRaw from "lucide-static/icons/eye.svg?raw";
-import filmRaw from "lucide-static/icons/film.svg?raw";
 import loaderRaw from "lucide-static/icons/loader-2.svg?raw";
 import moonRaw from "lucide-static/icons/moon.svg?raw";
 import pauseRaw from "lucide-static/icons/pause.svg?raw";
@@ -9,6 +8,7 @@ import playRaw from "lucide-static/icons/play.svg?raw";
 import rectangleHorizontalRaw from "lucide-static/icons/rectangle-horizontal.svg?raw";
 import rectangleVerticalRaw from "lucide-static/icons/rectangle-vertical.svg?raw";
 import repeatRaw from "lucide-static/icons/repeat.svg?raw";
+import rocketRaw from "lucide-static/icons/rocket.svg?raw";
 import rotateCcwRaw from "lucide-static/icons/rotate-ccw.svg?raw";
 import sparklesRaw from "lucide-static/icons/sparkles.svg?raw";
 import squareRaw from "lucide-static/icons/square.svg?raw";
@@ -29,11 +29,11 @@ export const ui = {
   rectangleHorizontal: rectangleHorizontalRaw,
   sparkles: sparklesRaw,
   eye: eyeRaw,
-  film: filmRaw,
   chevronDown: chevronDownRaw,
   repeat: repeatRaw,
   sun: sunRaw,
   moon: moonRaw,
+  rocket: rocketRaw,
 } as const;
 
 /** Solid brand/social icons (simple-icons) — no fill set, need one injected. */
@@ -69,5 +69,10 @@ export function brandIcon(svg: string, className = "w-4 h-4"): string {
  * legible here than any generic icon would be.
  */
 export function transparencySwatch(className = "w-4 h-4"): string {
-  return `<span class="${className} inline-block rounded-sm" style="background-image:conic-gradient(#8b8b8b 90deg,transparent 90deg 180deg,#8b8b8b 180deg 270deg,transparent 270deg);background-size:6px 6px;"></span>`;
+  return `<span class="${className} inline-block rounded-full border border-line" style="background-image:conic-gradient(#8b8b8b 90deg,transparent 90deg 180deg,#8b8b8b 180deg 270deg,transparent 270deg);background-size:6px 6px;"></span>`;
+}
+
+/** Solid color swatch, for picking a background preset. */
+export function colorSwatch(color: string, className = "w-4 h-4"): string {
+  return `<span class="${className} inline-block rounded-full border border-line" style="background-color:${color};"></span>`;
 }

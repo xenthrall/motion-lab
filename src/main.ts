@@ -1,5 +1,5 @@
 import { ASPECT_ICONS } from "@/components/format-icons";
-import { brandIcon, transparencySwatch, ui, uiIcon } from "@/components/icons";
+import { brandIcon, colorSwatch, transparencySwatch, ui, uiIcon } from "@/components/icons";
 import { createSidebar } from "@/components/sidebar";
 import { createStage } from "@/components/stage";
 import { createStatus } from "@/components/status";
@@ -9,9 +9,10 @@ import { createToolbar } from "@/components/toolbar";
 import { createTransportControls } from "@/components/transport-controls";
 import { experiments } from "@/experiments/registry";
 import { ASPECT_PRESETS, DEFAULT_ASPECT_ID, getAspectPreset } from "@/export/aspect-presets";
-import { type ExportFormat, recordSvgAnimation } from "@/export/capture";
+import { BACKGROUNDS, DEFAULT_BACKGROUND_ID, getBackground } from "@/export/backgrounds";
+import { recordSvgAnimation } from "@/export/capture";
 import { downloadBlob } from "@/export/download";
-import { DEFAULT_FILE_FORMAT, FILE_FORMATS, getFileFormat } from "@/export/file-formats";
+import { expressions } from "@/svg/mascot/expressions";
 import mascotSvg from "@/svg/mascot/tequia-base.svg?raw";
 import { clearSceneProps } from "@/svg/utils/scene-props";
 import gsap from "gsap";
@@ -21,7 +22,7 @@ import gsap from "gsap";
  * experiments (a gallery, selecting one plays it looping immediately) and
  * app-level settings (theme), and a center panel that's just the preview
  * (stage + timeline scrubber + transport controls) with a compact toolbar
- * for aspect ratio / file format (each opens a small popover) and export.
+ * for aspect ratio / background (each opens a small popover) and export.
  * No animation logic lives here — it only wires together src/animations,
  * src/experiments, src/export and src/components.
  */
@@ -69,7 +70,12 @@ applyTheme(currentTheme);
 const stage = createStage(stageContainer, mascotSvg);
 const status = createStatus(statusContainer);
 const timelineBar = createTimelineBar(timelineBarContainer, (seconds) => {
-  timeline.pause(seconds);
+  // .pause(seconds) suppresses events by default, which silently skips any
+  // tl.call()s between the old and new position (e.g. setExpression) —
+  // found by scrubbing mascot-adventure and landing on the wrong face.
+  // .time(seconds, false) seeks with events un-suppressed instead.
+  timeline.pause();
+  timeline.time(seconds, false);
   transport.setPlaying(false);
 });
 
@@ -80,10 +86,17 @@ function resetVisualState(): void {
   // looking invisible/mid-pose for an instant. Reset right after creating
   // a timeline so nothing weird flashes before playback kicks in.
   gsap.set([stage.parts.mascot, stage.parts.eyes], { clearProps: "all" });
+  // setExpression swaps EYES/MOUTH innerHTML directly — GSAP has no notion
+  // of an "end state" to rewind for that, so without this, restarting (or
+  // looping) an experiment that changes expression would start every
+  // replay still wearing whatever face it ended on (e.g. mascot-adventure
+  // looping back in still smiling from its "happy" ending).
+  stage.parts.eyes.innerHTML = expressions.neutral.eyes;
+  stage.parts.mouth.innerHTML = expressions.neutral.mouth;
 }
 
 let currentAspectId = DEFAULT_ASPECT_ID;
-let currentFileFormat: ExportFormat = DEFAULT_FILE_FORMAT;
+let currentBackgroundId = DEFAULT_BACKGROUND_ID;
 let currentExperimentId = experiments[0].id;
 let timeline = experiments[0].create(stage.parts);
 let pendingResolve: (() => void) | null = null;
@@ -100,6 +113,7 @@ function wireTimeline(): void {
     pendingResolve = null;
     resolve?.();
     if (loopEnabled && !isExporting) {
+      resetVisualState();
       timeline.restart();
       return;
     }
@@ -123,6 +137,7 @@ function setExperiment(id: string): void {
 function playFromStart(): Promise<void> {
   return new Promise((resolve) => {
     pendingResolve = resolve;
+    resetVisualState();
     transport.setPlaying(true);
     timeline.restart();
   });
@@ -171,24 +186,27 @@ const aspectItems = ASPECT_PRESETS.map((preset) => {
   };
 });
 
-const fileFormatItems = FILE_FORMATS.map((format) => ({
-  id: format.id,
-  label: format.label,
+const backgroundItems = BACKGROUNDS.map((background) => ({
+  id: background.id,
+  label: background.label,
   iconHtml:
-    format.id === "webm-transparent" ? transparencySwatch("w-4 h-4") : uiIcon(ui.film, "w-4 h-4"),
+    background.kind === "transparent"
+      ? transparencySwatch()
+      : colorSwatch(background.color ?? "#000"),
 }));
 
-const toolbar = createToolbar(toolbarContainer, aspectItems, fileFormatItems, {
+const toolbar = createToolbar(toolbarContainer, aspectItems, backgroundItems, {
   onAspectChange(id) {
     currentAspectId = id;
     stage.setAspect(getAspectPreset(id));
   },
-  onFileFormatChange(id) {
-    currentFileFormat = id as ExportFormat;
+  onBackgroundChange(id) {
+    currentBackgroundId = id;
+    stage.setBackground(getBackground(id));
   },
   async onExport() {
     const aspect = getAspectPreset(currentAspectId);
-    const fileFormat = getFileFormat(currentFileFormat);
+    const background = getBackground(currentBackgroundId);
     isExporting = true;
     toolbar.setExportEnabled(false);
     toolbar.setPickersEnabled(false);
@@ -201,13 +219,14 @@ const toolbar = createToolbar(toolbarContainer, aspectItems, fileFormatItems, {
       const { blob, extension } = await recordSvgAnimation(stage.svg, playFromStart, {
         width: aspect.width,
         height: aspect.height,
-        format: fileFormat.id,
+        format: background.kind === "transparent" ? "webm-transparent" : "mp4",
+        backgroundColor: background.color,
       });
       downloadBlob(
         blob,
-        `tequia-${currentExperimentId}-${aspect.id}-${fileFormat.id}.${extension}`,
+        `tequia-${currentExperimentId}-${aspect.id}-${background.id}.${extension}`,
       );
-      status.set(`Exportado — ${aspect.label} · ${fileFormat.label}`, "success");
+      status.set(`Exportado — ${aspect.label} · ${background.label}`, "success");
     } catch (error) {
       status.set(`Error al exportar: ${(error as Error).message}`, "error");
     } finally {

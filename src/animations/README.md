@@ -44,11 +44,59 @@ Cada archivo en `moves/` exporta una función pura con esta firma:
 | `eyesShift(parts, { x, y, duration })` | `eyes` | desplaza la mirada en una dirección |
 | `widenEyes(parts, { scale, duration })` | `eyes` | ojos bien abiertos (sorpresa/curiosidad) |
 | `settle(parts, { duration })` | `mascot` + `eyes` | vuelve a la postura neutra (posición, rotación, escala) |
+| `setExpression(parts, shapes, { pop, duration })` | `eyes` + `mouth` | cambia la **forma** (no solo transform) — ver más abajo |
+| `spin(parts, { rotations, duration })` | `mascot` | giro completo de cuerpo entero (rotación relativa `+=360°`) |
+| `wobble(parts, { cycles, duration, angle })` | `mascot` | tambaleo nervioso/mareado, repetido |
 
 `tilt`/`lean` animan `parts.mascot` (no `parts.head`) a propósito: HEAD,
 EYES y MOUTH son grupos hermanos, no anidados — rotar/mover solo HEAD los
 desalinearía. Cualquier gesto de "cuerpo completo" (inclinar, acercarse,
 saltar) siempre debe animar `parts.mascot`.
+
+## Cambiar la forma de ojos/boca (expresiones)
+
+`setExpression` no anima una forma existente, la **reemplaza** — usa los
+presets de `src/svg/mascot/expressions.ts` (`neutral`, `surprised`,
+`happy`, `starstruck`, `dizzy`, `determined`, `wink`):
+
+```ts
+tl.add(setExpression(parts, expressions.starstruck), "<");
+```
+
+Es un corte instantáneo (con un pequeño "pop" de énfasis en los ojos),
+no un morph — es intencional, un cambio de expresión súbito es un
+recurso cómico de toda la vida en animación, no algo que haya que
+disimular. Agregar una expresión nueva: sumar una entrada a
+`expressions.ts` con las mismas coordenadas que usa `tequia-base.svg`
+(ojos ~y=67-89, boca ~y=99-113, centro x=90) — no a un move.
+
+> ⚠️ **Gotcha de GSAP encontrado en la práctica:** `timeline.pause(segundos)`
+> usa `suppressEvents: true` por defecto, lo que **silencia** cualquier
+> `tl.call()` (como `setExpression`) que quede entre la posición vieja y
+> la nueva al saltar — el resultado visual es que un scrub grande puede
+> "aterrizar" con la cara equivocada (se ve la última expresión que sí
+> llegó a dispararse, no la que correspondía a ese punto). Confirmado
+> comparando reproducción en tiempo real (correcta) contra saltos con
+> `pause(t)` (incorrectos) en `mascot-adventure`, que es la primera
+> animación con suficientes cambios de expresión para notarlo. El fix:
+> para **seekear** (no solo pausar en el lugar actual), usar
+> `timeline.pause(); timeline.time(segundos, false);` — el segundo
+> argumento `false` de `.time()` desactiva el `suppressEvents`. Ya
+> aplicado en el scrubber de `main.ts`.
+
+> ⚠️ **Otro gotcha relacionado — expresión que no se resetea al
+> reiniciar/loopear:** `setExpression` muta `innerHTML` directamente; a
+> diferencia de un transform, GSAP no tiene forma de "rebobinar" eso solo
+> reproduciendo el timeline desde 0. Si un experimento cambia de expresión
+> y después se reinicia (botón Reiniciar, exportar, o el bucle
+> automático completando un ciclo), sin nada adicional arrancaría el
+> nuevo ciclo mostrando la ÚLTIMA cara con la que terminó el anterior
+> (`mascot-adventure` reiniciaba visiblemente sonriendo). El fix vive en
+> `main.ts`, no en el kit: `resetVisualState()` restaura EYES/MOUTH a
+> `expressions.neutral` además de limpiar transforms, y se llama antes de
+> **cualquier** `timeline.restart()` (manual, por loop, o al arrancar un
+> experimento nuevo) — no hace falta que un experimento se preocupe por
+> esto al componerse, ya está cubierto centralizadamente.
 
 ## Reaccionar a algo en la escena (objetos de utilería)
 
@@ -64,13 +112,19 @@ const object = upsertSceneProp(parts.root, "algun-id-estable", "circle", {
 tl.to(object, { opacity: 1, duration: 0.3 }, "+=0.15");
 ```
 
-`upsertSceneProp` es idempotente (si ya existe una prop con ese id, la
-reemplaza) y las props quedan marcadas con `data-scene-prop` para que
-`clearSceneProps(root)` pueda limpiarlas al cambiar de experimento — eso
-ya lo hace `main.ts` en `setExperiment()`, no hace falta repetirlo por
-experimento. Ver `src/experiments/mascot-curiosity.ts` como ejemplo
-completo (objeto que aparece, la mascota lo nota, reacciona, y todo
-vuelve a neutro).
+Para un objeto compuesto por varias formas (un bicho con patas, un
+cohete con aletas), usar `upsertSceneGroup(root, id, innerSvgMarkup)` en
+vez de `upsertSceneProp` — mismo comportamiento idempotente, pero crea un
+`<g>` con markup arbitrario en vez de un único elemento con atributos.
+
+`upsertSceneProp`/`upsertSceneGroup` son idempotentes (si ya existe una
+prop con ese id, la reemplazan) y las props quedan marcadas con
+`data-scene-prop` para que `clearSceneProps(root)` pueda limpiarlas al
+cambiar de experimento — eso ya lo hace `main.ts` en `setExperiment()`,
+no hace falta repetirlo por experimento. Ver
+`src/experiments/mascot-curiosity.ts` (un objeto simple) y
+`src/experiments/mascot-adventure.ts` (varios objetos compuestos, con
+guion completo documentado en el archivo) como ejemplos.
 
 ## Componer una animación (un "experimento")
 

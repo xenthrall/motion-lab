@@ -1,4 +1,5 @@
 import type { MascotParts } from "@/svg/utils/query-mascot";
+import { createMascotAdventureTimeline } from "./mascot-adventure";
 import { createMascotCuriosityTimeline } from "./mascot-curiosity";
 import { createMascotIntroTimeline } from "./mascot-intro";
 
@@ -27,5 +28,12 @@ export const experiments: ExperimentDefinition[] = [
     description:
       "La mascota respira, nota un objeto nuevo en escena, lo mira con curiosidad, se acerca y vuelve a su postura neutra.",
     create: createMascotCuriosityTimeline,
+  },
+  {
+    id: "mascot-adventure",
+    label: "La aventura del código",
+    description:
+      "Un bicho la asusta, persigue y aplasta; se le prende el foco con una idea; programa, toma café de más y se marea; festeja con un giro y despega un cohete. ~18s de historia.",
+    create: createMascotAdventureTimeline,
   },
 ];

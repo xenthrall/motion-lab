@@ -26,6 +26,23 @@ export function upsertSceneProp<K extends keyof SVGElementTagNameMap>(
   return el;
 }
 
+/**
+ * Same idea as `upsertSceneProp`, but for a compound object made of
+ * several shapes (a `<g>` with arbitrary inner markup) instead of a
+ * single element — e.g. a hand-drawn bug, rocket, or lightbulb built
+ * from a handful of primitives. `innerSvg` is trusted markup authored in
+ * this codebase, never user input.
+ */
+export function upsertSceneGroup(root: SVGSVGElement, id: string, innerSvg: string): SVGGElement {
+  root.querySelector(`[data-scene-prop="${id}"]`)?.remove();
+
+  const g = document.createElementNS(SVG_NS, "g") as SVGGElement;
+  g.dataset.sceneProp = id;
+  g.innerHTML = innerSvg;
+  root.appendChild(g);
+  return g;
+}
+
 /** Removes every scene prop under `root` — call before switching experiments. */
 export function clearSceneProps(root: SVGSVGElement): void {
   for (const el of root.querySelectorAll("[data-scene-prop]")) {

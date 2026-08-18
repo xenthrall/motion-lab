@@ -24,3 +24,12 @@ export type { WidenEyesOptions } from "./widen-eyes";
 
 export { settle } from "./settle";
 export type { SettleOptions } from "./settle";
+
+export { setExpression } from "./set-expression";
+export type { SetExpressionOptions } from "./set-expression";
+
+export { spin } from "./spin";
+export type { SpinOptions } from "./spin";
+
+export { wobble } from "./wobble";
+export type { WobbleOptions } from "./wobble";

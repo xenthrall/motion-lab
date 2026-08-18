@@ -18,17 +18,25 @@ Ya hay una base funcional de punta a punta:
 
 - Un **kit de animación** (`src/animations/`) — funciones "move"
   reutilizables sobre GSAP (entrada, idle, blink, bounce, tilt, lean,
-  mirada, ojos bien abiertos, settle) que cualquier IA o persona puede
-  componer para generar una animación nueva a partir de un prompt, sin
-  reinventar la estructura. Ver
+  mirada, ojos bien abiertos, settle, **cambio de expresión** —forma real
+  de ojos/boca, no solo transform—, giro, tambaleo) que cualquier IA o
+  persona puede componer para generar una animación nueva a partir de un
+  prompt, sin reinventar la estructura. Ver
   [`src/animations/README.md`](src/animations/README.md).
-- Dos **experimentos reales**, registrados en `src/experiments/registry.ts`:
+- Tres **experimentos reales**, registrados en `src/experiments/registry.ts`:
   - `mascot-intro` — entrada + idle + blink + bounce.
   - `mascot-curiosity` — la mascota respira, nota un objeto que aparece en
     escena, reacciona con curiosidad (ojos bien abiertos, mirada, cabeza
     inclinada, se acerca, rebotitos), parpadea y vuelve a neutro. El
     objeto es una prop de escena genérica (`src/svg/utils/scene-props.ts`),
     no parte del SVG de la mascota.
+  - `mascot-adventure` — **"La aventura del código"**, ~19s: un `{ }`
+    aparece y lo examina, un bicho la asusta y lo persigue hasta
+    aplastarlo, se le prende el foco con una idea (ojos de estrella),
+    programa al ritmo de 0s y 1s, un café de más la marea, festeja con un
+    check y un giro, y despega un cohete — con siete expresiones faciales
+    distintas y ocho objetos hechos a mano (`src/experiments/mascot-adventure.ts`,
+    guion completo documentado ahí).
 - Un **lab interactivo** (`npm run dev`) con layout de **panel
   administrativo**, responsive (probado en desktop y mobile) y con
   **tema claro/oscuro** (toggle manual, persistido, respeta la
@@ -41,20 +49,25 @@ Ya hay una base funcional de punta a punta:
     tiempo arrastrable** (duración calculada, tiempo actual) y los
     controles de transporte (reiniciar / play-pausa que **refleja el
     estado real** / **bucle activable-desactivable**).
-  - **Toolbar compacto** sobre la preview — relación de aspecto y formato
-    de archivo son dos botones que abren un **popover** con las opciones
+  - **Toolbar compacto** sobre la preview — relación de aspecto y
+    **fondo** son dos botones que abren un **popover** con las opciones
     (en vez de ocupar espacio fijo en pantalla), más el botón de
-    descarga.
-- **Exportación a dos formatos de archivo** (`src/export/`), con APIs
-  nativas del navegador (canvas + `MediaRecorder`) — sin dependencias
-  nuevas:
-  - **MP4** — fondo sólido, para subir directo a redes sociales.
-  - **WebM transparente** — sin fondo (canal alfa real, verificado
+    descarga. Lo que se ve en el stage (aspecto + fondo) es exactamente
+    lo que se exporta.
+- **Fondos configurables** (`src/export/backgrounds.ts`) — lista plana y
+  fácil de ampliar/reemplazar. De momento tres sólidos elegidos para
+  contrastar bien con el violeta de la mascota (Medianoche, Crema,
+  Esmeralda) más Transparente. El **formato de archivo se deriva
+  automáticamente** del fondo elegido — ya no es una elección aparte:
+  - Fondo sólido → **MP4**, listo para subir directo a redes sociales.
+  - Fondo transparente → **WebM** con canal alfa real (verificado
     empíricamente), pensado como asset reutilizable (overlays, edición,
     composición web).
-  
-  Ver [`src/export/README.md`](src/export/README.md) para el detalle
-  técnico de cómo se logra la transparencia sin ninguna dependencia nueva.
+
+  Sin dependencias nuevas — `src/export/` usa únicamente `canvas` +
+  `MediaRecorder` nativos del navegador. Ver
+  [`src/export/README.md`](src/export/README.md) para el detalle técnico
+  de la transparencia y de cómo agregar un fondo nuevo.
 
 Sigue habiendo mucho roadmap por delante (expresiones, morphing,
 timelines más orgánicas) — ver [Próximos experimentos](#próximos-experimentos-roadmap).
@@ -99,7 +112,7 @@ src/
 │   │                  #   popover, transport-controls, timeline-bar, status,
 │   │                  #   theme, toggle-group, icons, stage, format-icons,
 │   │                  #   experiment-icons
-├── experiments/      # mascot-intro.ts, mascot-curiosity.ts + registry.ts
+├── experiments/      # mascot-intro.ts, mascot-curiosity.ts, mascot-adventure.ts + registry.ts
 ├── export/           # aspect-presets, file-formats, captura a video (MediaRecorder), descarga
 ├── svg/
 │   ├── mascot/        # SVG de la mascota Tequia (versión de trabajo + referencia)
@@ -127,10 +140,10 @@ npm run format       # aplica formato con Biome
 ```
 
 En `npm run dev`: elegí un experimento en la galería del sidebar (arranca
-en bucle al instante), ajustá relación de aspecto/formato de archivo
-desde los popovers del toolbar, reproducí/pausá/arrastrá la línea de
-tiempo o desactivá el bucle, y usá **"Descargar"** para exportar
-exactamente lo que se está reproduciendo en pantalla.
+en bucle al instante), ajustá relación de aspecto/fondo desde los
+popovers del toolbar, reproducí/pausá/arrastrá la línea de tiempo o
+desactivá el bucle, y usá **"Descargar"** para exportar exactamente lo
+que se está reproduciendo en pantalla.
 
 **Verificado en un navegador real** (Chrome headless vía Playwright, no
 solo compilación): autoplay + bucle al seleccionar un experimento
@@ -151,6 +164,28 @@ de vuelta **en el propio navegador** para confirmar que el canal alfa es
 real (esquina `[0,0,0,0]`, mascota opaca `alfa=255`) — no alcanza con
 mirar el archivo, porque `ffmpeg` en línea de comandos no compone ese
 canal alfa por defecto al extraer un frame (ver `src/export/README.md`).
+
+`mascot-adventure` (19.23s reales, medidos con `timeline.duration()`) se
+verificó con capturas en más de una docena de puntos a lo largo de toda
+la historia (objeto por objeto, expresión por expresión) y con
+reproducción en tiempo real completa. En el camino se encontraron y
+corrigieron dos bugs reales:
+
+- **Scrubbing a la cara equivocada:** saltar con `timeline.pause(segundos)`
+  silencia los `tl.call()` de por medio (`suppressEvents` por defecto en
+  GSAP), así que arrastrar la línea de tiempo rápido hacia el final podía
+  "aterrizar" con la cara equivocada. Fix: `timeline.time(segundos,
+  false)` (ver `src/animations/README.md`). Confirmado con el estado real
+  del DOM y exportando el clip completo a MP4 (el frame final tiene la
+  expresión feliz correcta).
+- **La expresión no se reseteaba al reiniciar/loopear:** el bucle
+  automático (y el botón Reiniciar) volvían a arrancar el clip todavía
+  con la última cara del ciclo anterior (`mascot-adventure` volvía a
+  empezar sonriendo en vez de neutra). Fix: `resetVisualState()` en
+  `main.ts` ahora también restaura EYES/MOUTH a la expresión neutra antes
+  de cualquier restart. Confirmado dejando correr un ciclo completo de
+  19.23s + 2.5s del siguiente y verificando que la boca vuelve a ser la
+  neutra, no la "happy" del cierre anterior.
 
 En consola del navegador, en modo dev, `window.__lab` expone `gsap`,
 `stage` y el `timeline` actual para inspección manual (no existe en el
@@ -173,8 +208,14 @@ Lo que ya existe está tachado; el resto sigue siendo hoja de ruta:
     reproductor de video (play/pausa real, línea de tiempo arrastrable).~~
 8d. ~~UI tipo panel administrativo (sidebar + galería + popovers para
     formato), bucle activable/desactivable, tema claro/oscuro.~~
-9. Cambiar expresiones (variantes de forma de EYES/MOUTH, no solo
-   transformarlos — ver `src/svg/mascot/README.md`).
+9. ~~Cambiar expresiones (variantes de forma de EYES/MOUTH, no solo
+   transformarlos).~~ `setExpression` + `src/svg/mascot/expressions.ts`
+   (7 expresiones), usado en `mascot-adventure`.
+9b. ~~Animación larga con guion (~15s+), objetos hechos a mano y varias
+    expresiones — `mascot-adventure`.~~
+9c. ~~Fondos configurables (3 sólidos + transparente), escalables/
+    reemplazables (`src/export/backgrounds.ts`); formato de archivo
+    derivado automáticamente del fondo.~~
 10. Animación de accesorios (`EXTRA`).
 11. Morphing de partes (paths) — candidato: `MorphSVGPlugin` de GSAP.
 12. Animación basada en scroll — candidato: `ScrollTrigger` de GSAP.

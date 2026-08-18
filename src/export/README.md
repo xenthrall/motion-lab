@@ -17,22 +17,55 @@ navegador.
   con su resolución de exportación. El mismo preset dimensiona el stage
   en pantalla (`src/components/stage.ts`), así lo que se ve en el
   navegador es lo que se exporta.
-- `file-formats.ts` — los dos formatos de archivo ofrecidos (`mp4`,
-  `webm-transparent`), independientes de la relación de aspecto.
+- `backgrounds.ts` — los fondos disponibles (ver más abajo). El mismo
+  preset pinta el fondo del stage en pantalla, mismo principio WYSIWYG
+  que `aspect-presets.ts`.
 - `download.ts` — dispara la descarga del Blob resultante.
+
+`capture.ts` sigue aceptando `format` (`"mp4" | "webm-transparent"`) como
+antes, pero ya **no es una elección directa del usuario** — `main.ts` lo
+deriva del `kind` del fondo elegido (`"solid"` → mp4, `"transparent"` →
+webm-transparent), así no existe una combinación inválida que elegir
+(antes formato de archivo y fondo eran selectores independientes y nada
+impedía, conceptualmente, pedir transparencia con un fondo sólido).
+
+## Fondos (`backgrounds.ts`)
+
+Lista plana y reemplazable — agregar, quitar o recolorear un fondo es un
+cambio de una línea ahí, en ningún otro lado. De momento:
+
+| id | Nombre | Tipo | Color |
+|---|---|---|---|
+| `midnight` | Medianoche | sólido | `#0a0a0f` |
+| `cream` | Crema | sólido | `#f6f0e4` |
+| `emerald` | Esmeralda | sólido | `#0d3b34` |
+| `transparent` | Transparente | transparente | — |
+
+Los tres sólidos se eligieron para contrastar bien con el gradiente
+violeta de la mascota en ambos extremos (claro arriba, oscuro abajo):
+un neutro muy oscuro, un cálido casi-blanco, y un verde-azulado profundo
+con un matiz claramente distinto al violeta (evita elegir un cuarto tono
+de violeta, que podría no contrastar bien contra la parte más oscura del
+propio gradiente de la mascota). Verificado extrayendo un frame del
+video exportado y comprobando el color de fondo real en el píxel.
+
+Para agregar un fondo nuevo: sumar una entrada a `BACKGROUNDS` en
+`backgrounds.ts` — el picker de la UI (`src/components/toolbar.ts`) y la
+exportación lo recogen automáticamente, no hace falta tocar nada más.
 
 ## Formato de salida
 
-Dos opciones, seleccionables en la UI:
+Se deriva del fondo elegido (ver arriba):
 
-- **MP4** (por defecto): se intenta MP4 primero
+- **Fondo sólido → MP4**: se intenta MP4 primero
   (`MediaRecorder.isTypeSupported`) y se cae a WebM si el navegador no lo
-  soporta. Fondo sólido, listo para subir directo a redes sociales.
-- **WebM transparente**: fuerza `video/webm;codecs=vp9` y **omite** el
-  relleno de fondo del canvas (`ctx.clearRect` en vez de `ctx.fillRect`),
-  así el video queda con canal alfa real — pensado como asset reutilizable
-  (overlay, edición, composición web), no para redes sociales
-  directamente (Instagram/TikTok no aceptan video con transparencia).
+  soporta. Listo para subir directo a redes sociales.
+- **Fondo transparente → WebM**: fuerza `video/webm;codecs=vp9` y
+  **omite** el relleno de fondo del canvas (`ctx.clearRect` en vez de
+  `ctx.fillRect`), así el video queda con canal alfa real — pensado como
+  asset reutilizable (overlay, edición, composición web), no para redes
+  sociales directamente (Instagram/TikTok no aceptan video con
+  transparencia).
 
 ### Transparencia: verificado empíricamente, no asumido
 
