@@ -146,6 +146,65 @@ TikTok").
   solo paquete no tendría sentido, son catálogos con propósitos distintos
   y ninguno cubre al otro.
 
+### `playwright` (dev)
+
+Automatiza un navegador Chromium real desde Node — usada exclusivamente
+por `scripts/render.mjs`, el renderizador offline (ver
+`src/export/README.md`). No toca la app en sí (el bundle que ve el
+usuario no la incluye, ni siquiera de forma tree-shakeable — es un
+devDependency que solo corre en un script de Node).
+
+- **Por qué hace falta ahora, no antes:** la exportación en vivo (tiempo
+  real, en el navegador) empezó a mostrar lag real en animaciones largas
+  (`mascot-adventure`). Se investigaron primero optimizaciones sin sumar
+  dependencias — ninguna funcionó (ver detalle en
+  `src/export/README.md`) — así que la única forma de eliminar el lag de
+  raíz era quitar la restricción de tiempo real, lo que requiere driving
+  el timeline desde fuera del navegador interactivo.
+- **Por qué Playwright y no Puppeteer:** ambas son opciones maduras y
+  equivalentes para este uso (automatizar Chromium). Playwright ya se
+  usó extensivamente durante el desarrollo de este proyecto para testing
+  manual (vía `playwright-core` en un scratchpad, nunca como dependencia
+  real) — se conoce su comportamiento en este entorno específico
+  (incluidos gotchas reales encontrados, como que `page.evaluate()`
+  cuelga si el callback devuelve un objeto de GSAP con referencias
+  circulares). Se usa el paquete completo `playwright` (no
+  `playwright-core`) para que el script funcione en cualquier máquina
+  sin depender de que el navegador correcto esté instalado en una ruta
+  adivinable.
+- **Por qué no Remotion:** Remotion resolvería el mismo problema, pero
+  **es** una capa sobre React — segundo motivo (junto con el pipeline de
+  renderizado) por el que se había descartado hasta ahora (ver
+  "Descartadas" más abajo). `scripts/render.mjs` logra exactamente lo
+  mismo (renderizado determinista frame-por-frame) reutilizando el 100%
+  del código de animación existente (GSAP + los propios experimentos),
+  sin introducir React ni una capa de composición nueva.
+
+### `@clack/prompts` (dev)
+
+CLI interactiva (flechas + enter, confirmaciones, spinners) para
+`scripts/render.mjs` — permite elegir experimento/aspecto/fondo/fps sin
+tener que recordar ni escribir los ids de memoria en cada invocación.
+
+- **Por qué esta y no otra:** es de la misma familia que ya se usa
+  indirectamente vía `vite`/otras herramientas del ecosistema (mismo
+  autor que `create-vite`), tipada en TypeScript, sin dependencias
+  pesadas propias (`@clack/core`, `sisteransi`, utilidades de ancho de
+  string para manejar emojis/ANSI correctamente). Cubre exactamente lo
+  necesario — `select` (flechas), `confirm`, `spinner`, `intro`/`outro`
+  — sin sumar un framework de CLI completo (comandos, subcomandos,
+  parsing propio de flags) que no hace falta: los flags siguen
+  parseándose a mano (`parseArgs` en el propio script, ya eran solo
+  `--clave=valor`).
+- **Diseño:** cada valor se toma de su flag si vino dado; si no, se
+  pregunta. Solo se muestra una confirmación final si al menos un valor
+  fue interactivo — un run con las cuatro flags (o `--yes`) nunca toca
+  stdin, sigue siendo seguro invocarlo desde un script o CI (ver
+  `src/export/README.md`).
+- **No se usa en la app** (`src/`) en absoluto — vive solo en
+  `scripts/render.mjs`, un devDependency que no afecta el bundle de
+  producción.
+
 ## Descartadas (evaluadas, no instaladas)
 
 ### Motion (antes Framer Motion, paquete `motion`)
@@ -192,19 +251,39 @@ para scroll-driven animation y ya cubre este caso.
 ### Remotion
 
 Framework para renderizar animaciones a video frame-por-frame usando React
-+ un navegador headless. Es la herramienta más alineada con la necesidad
-futura de "generación de video para redes sociales", pero:
++ un navegador headless. Se descartó desde el inicio del proyecto por
+requerir React como dependencia central (Remotion **es** una capa sobre
+React) — un costo que no se justificaba sin una necesidad concreta.
 
-- Requiere React como dependencia central (Remotion **es** una capa sobre
-  React), lo cual el alcance actual explícitamente evita justificar sin
-  necesidad concreta.
-- Implica un pipeline de renderizado (Chromium headless + ffmpeg) que no
-  tiene sentido instalar antes de tener animaciones que exportar.
+Esa necesidad concreta llegó (exportación determinista, sin lag, para
+animaciones pesadas — ver `playwright` más arriba y
+`src/export/README.md`), pero se resolvió **sin** Remotion: un script de
+~200 líneas (`scripts/render.mjs`) con Playwright + `ffmpeg` logra el
+mismo renderizado frame-por-frame reutilizando directamente el código de
+animación existente. No hay nada que Remotion aportara aquí que
+justificara sumar React — el "pipeline de renderizado" que antes se
+mencionaba como motivo adicional para descartarlo ya no aplica, se
+construyó y es liviano.
 
-**Queda en el roadmap** como la herramienta candidata para exportación de
-video, el día que se aborde esa etapa — probablemente como un subsistema
-aislado (p. ej. `export/` o un paquete separado) que consuma los módulos de
-`svg/` y `animations/`, sin forzar React en todo el laboratorio.
+**Revisar de nuevo si** en algún momento se necesita algo que Remotion
+resuelve y un script simple no: renderizado paralelo/distribuido,
+composición de múltiples clips en un timeline de video más complejo, o
+integración con un pipeline de CI para generar variantes en batch.
+
+### `ffmpeg-static`
+
+Empaqueta un binario de `ffmpeg` precompilado y lo descarga en el
+`postinstall`, evitando que quien use `scripts/render.mjs` necesite
+instalar `ffmpeg` por su cuenta. Se descartó por ahora: el binario agrega
+~50-80MB a **todo** `npm install` del proyecto, para todo el mundo,
+aunque nunca vayan a usar el renderer offline — un costo alto para un
+requisito (`ffmpeg` en el sistema) que ya es común y de instalación
+única. El script falla con un mensaje claro y accionable si no lo
+encuentra en el PATH.
+
+**Reconsiderar si** el renderer offline pasa a ser el camino principal de
+exportación (no una herramienta ocasional) o si el equipo/CI no puede
+garantizar `ffmpeg` preinstalado.
 
 ### PixiJS / Three.js (canvas / WebGL)
 
@@ -224,9 +303,11 @@ mediante GSAP operando directamente sobre el DOM no necesita un modelo de
 componentes; introducir React ahora añadiría complejidad de build y un
 cambio de paradigma sin beneficio inmediato.
 
-**Se reconsiderará** puntualmente cuando se aborde exportación de video con
-Remotion — y, aun así, evaluando si conviene aislarlo solo a ese subsistema
-en lugar de migrar todo el laboratorio.
+El motivo original para reconsiderarlo era "si se aborda exportación de
+video con Remotion" — ya se abordó exportación de video determinista
+(`scripts/render.mjs`), pero sin Remotion (ver esa sección más abajo), así
+que ese disparador ya no aplica. Sigue sin haber necesidad concreta de
+React en ningún punto del laboratorio.
 
 ### ESLint + Prettier
 
@@ -267,5 +348,12 @@ utilidad de preparación de assets (`svgo`), y para la UI del lab —
 deliberadamente separada de la animación de la mascota— Tailwind v4 vía su
 plugin de Vite más dos paquetes de iconos SVG puros (`lucide-static` para
 interfaz, `simple-icons` para marcas), ambos consumidos con el mismo
-patrón `?raw` que ya usaba el SVG de la mascota. Todo lo demás queda
-documentado como decisión futura, no como deuda técnica.
+patrón `?raw` que ya usaba el SVG de la mascota.
+
+La exportación de video tiene dos capas, cada una con su propio
+presupuesto de dependencias: la vía en vivo sigue en cero dependencias
+nuevas (solo `canvas` + `MediaRecorder` del navegador), y la vía offline
+suma `playwright` — evaluada frente a la alternativa obvia (Remotion) y
+preferida por no requerir React, reutilizando en cambio el código de
+animación que ya existía. Todo lo demás queda documentado como decisión
+futura, no como deuda técnica.

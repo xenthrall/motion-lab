@@ -64,10 +64,25 @@ Ya hay una base funcional de punta a punta:
     empíricamente), pensado como asset reutilizable (overlays, edición,
     composición web).
 
-  Sin dependencias nuevas — `src/export/` usa únicamente `canvas` +
-  `MediaRecorder` nativos del navegador. Ver
-  [`src/export/README.md`](src/export/README.md) para el detalle técnico
-  de la transparencia y de cómo agregar un fondo nuevo.
+  La exportación en vivo (botón "Descargar" en la UI) usa únicamente
+  `canvas` + `MediaRecorder` nativos del navegador — cero dependencias
+  nuevas.
+- **Renderizador offline** (`npm run render`, `scripts/render.mjs`) —
+  para cuando la exportación en vivo pierde frames en animaciones
+  largas/pesadas. Reproduce el mismo timeline de GSAP en un navegador
+  headless, pero pausado y avanzado frame por frame (sin presupuesto de
+  tiempo real), y lo codifica con `ffmpeg`. Más lento que la exportación
+  en vivo, pero **nunca pierde un frame** sin importar cuán compleja sea
+  la animación — verificado con "La aventura del código" completa
+  (577/577 frames exactos). **CLI interactiva** (`@clack/prompts`):
+  navegá con flechas + enter cualquier valor (experimento/aspecto/fondo/
+  fps) que no se haya pasado por flag; con las cuatro flags (o `--yes`)
+  corre sin tocar stdin, seguro para scripts/CI. Requiere `playwright`
+  (dev) + `ffmpeg` instalado en el sistema.
+
+  Ver [`src/export/README.md`](src/export/README.md) para el detalle
+  técnico de la transparencia, de cómo agregar un fondo nuevo, y de
+  cuándo usar cada vía de exportación.
 
 Sigue habiendo mucho roadmap por delante (expresiones, morphing,
 timelines más orgánicas) — ver [Próximos experimentos](#próximos-experimentos-roadmap).
@@ -91,12 +106,18 @@ timelines más orgánicas) — ver [Próximos experimentos](#próximos-experimen
 - **lucide-static** / **simple-icons** (dev) — iconos SVG puros (interfaz
   y logos de redes sociales respectivamente), importados con `?raw`, el
   mismo patrón que ya se usaba para el SVG de la mascota.
+- **Playwright** (dev) — solo para `scripts/render.mjs` (renderizador
+  offline), no toca la app. Automatiza Chromium para reproducir el
+  timeline frame por frame sin las restricciones de tiempo real de la
+  exportación en vivo.
 - **npm** — gestor de paquetes.
 
-Exportación de video con `canvas` + `MediaRecorder` nativos del navegador
-— ninguna dependencia nueva (Remotion sigue descartado por ahora, ver
-`src/export/README.md`). Sin frameworks de UI de aplicación (React, Vue,
-etc.). Ver [`docs/dependencies.md`](docs/dependencies.md) para el
+Exportación en vivo con `canvas` + `MediaRecorder` nativos del navegador
+— cero dependencias nuevas ahí. Remotion se evaluó específicamente para
+el renderizador offline y se descartó por requerir React sin necesidad
+real (ver `docs/dependencies.md` y `src/export/README.md`). Sin
+frameworks de UI de aplicación (React, Vue, etc.) en el laboratorio en
+sí. Ver [`docs/dependencies.md`](docs/dependencies.md) para el
 razonamiento completo de cada dependencia instalada y las descartadas.
 
 ## Estructura
@@ -113,13 +134,16 @@ src/
 │   │                  #   theme, toggle-group, icons, stage, format-icons,
 │   │                  #   experiment-icons
 ├── experiments/      # mascot-intro.ts, mascot-curiosity.ts, mascot-adventure.ts + registry.ts
-├── export/           # aspect-presets, file-formats, captura a video (MediaRecorder), descarga
+├── export/           # aspect-presets, backgrounds, rasterize (compartido), captura en vivo, descarga
 ├── svg/
 │   ├── mascot/        # SVG de la mascota Tequia (versión de trabajo + referencia)
 │   └── utils/         # query-mascot.ts, inline-svg.ts, scene-props.ts
 ├── utils/            # (vacío) helpers genéricos (dom, math, timing)
 ├── styles/           # global.css — solo el import de Tailwind + tokens de tema
 └── main.ts            # orquesta stage + controls + experimentos + export
+
+scripts/
+└── render.mjs         # renderizador offline determinista (npm run render)
 ```
 
 La mascota (`src/svg/mascot/`) está deliberadamente desacoplada del
@@ -137,13 +161,21 @@ npm run build       # build de producción (type-check + bundle)
 npm run preview      # sirve el build de producción localmente
 npm run lint        # revisa lint/formato con Biome
 npm run format       # aplica formato con Biome
+
+npx playwright install chromium   # una sola vez, para el renderizador offline
+npm run render                     # interactivo: flechas + enter para elegir experimento/aspecto/fondo/fps
+npm run render -- --list           # ver experimentos/aspectos/fondos disponibles
+npm run render -- --experiment=mascot-adventure --aspect=vertical --background=midnight --fps=30 --yes
 ```
 
 En `npm run dev`: elegí un experimento en la galería del sidebar (arranca
 en bucle al instante), ajustá relación de aspecto/fondo desde los
 popovers del toolbar, reproducí/pausá/arrastrá la línea de tiempo o
 desactivá el bucle, y usá **"Descargar"** para exportar exactamente lo
-que se está reproduciendo en pantalla.
+que se está reproduciendo en pantalla — instantáneo, ideal para previews.
+Si una animación larga/pesada se ve con lag en el video descargado, usá
+`npm run render` en su lugar: más lento, pero frame-perfecto sin importar
+la complejidad (requiere `ffmpeg` instalado en el sistema).
 
 **Verificado en un navegador real** (Chrome headless vía Playwright, no
 solo compilación): autoplay + bucle al seleccionar un experimento
@@ -187,9 +219,22 @@ corrigieron dos bugs reales:
   19.23s + 2.5s del siguiente y verificando que la boca vuelve a ser la
   neutra, no la "happy" del cierre anterior.
 
+**Renderizador offline** (`npm run render`): antes de construirlo se
+investigaron optimizaciones a la exportación en vivo — `createImageBitmap`
+para rasterizar el SVG falló directamente (0 bytes de salida, confirmado
+que es un problema del navegador/entorno y no de nuestro SVG probando con
+un `<rect>` trivial, revertido antes de llegar a ningún lado), y las otras
+dos alternativas medidas (Blob URL, reutilizar el `Image`) no mejoraron
+nada — así que el fix real era eliminar la restricción de tiempo real, no
+optimizarla. El script completo se probó con `mascot-adventure` (la
+animación más pesada): 577/577 frames exactos (confirmado con `ffprobe`,
+sin huecos), y el fondo transparente exportado por esta vía también se
+decodificó en el navegador para confirmar canal alfa real, igual que la
+vía en vivo.
+
 En consola del navegador, en modo dev, `window.__lab` expone `gsap`,
-`stage` y el `timeline` actual para inspección manual (no existe en el
-build de producción).
+`stage`, el `timeline` actual, y (`window.__lab.render`) el hook que usa
+`scripts/render.mjs` — nada de esto existe en el build de producción.
 
 ## Próximos experimentos (roadmap)
 
@@ -216,12 +261,18 @@ Lo que ya existe está tachado; el resto sigue siendo hoja de ruta:
 9c. ~~Fondos configurables (3 sólidos + transparente), escalables/
     reemplazables (`src/export/backgrounds.ts`); formato de archivo
     derivado automáticamente del fondo.~~
+9d. ~~Renderizador offline determinista (`npm run render`) para
+    animaciones largas/pesadas que pierden frames en la exportación en
+    vivo — sin Remotion/React, con Playwright + ffmpeg.~~
+9e. ~~CLI interactiva para el renderizador offline (flechas + enter vía
+    `@clack/prompts`), con flags opcionales para uso scriptable/CI.~~
 10. Animación de accesorios (`EXTRA`).
 11. Morphing de partes (paths) — candidato: `MorphSVGPlugin` de GSAP.
 12. Animación basada en scroll — candidato: `ScrollTrigger` de GSAP.
 13. Generación programática de video más allá de un solo clip (batch,
-    variantes por formato) — candidato: Remotion, si el navegador deja
-    de ser suficiente (ver `src/export/README.md`).
+    variantes por formato) — el renderizador offline (`scripts/render.mjs`)
+    ya cubre un clip a la vez; batch sería iterarlo por combinación de
+    experimento/aspecto/fondo, sin necesitar nada nuevo.
 
 ## Convención del SVG de la mascota
 

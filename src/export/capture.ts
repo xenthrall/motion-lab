@@ -1,3 +1,5 @@
+import { rasterizeSvgToCanvas } from "./rasterize";
+
 export type ExportFormat = "mp4" | "webm-transparent";
 
 export interface RecordOptions {
@@ -59,9 +61,25 @@ function pickMimeType(format: ExportFormat): { mimeType: string; extension: stri
  * offscreen canvas every animation frame, letterboxed to fit the target
  * width/height, and that canvas is what gets captured.
  *
+ * Rasterization is `new Image()` + a data: URI. Two alternatives were
+ * benchmarked against this exact scene (mascot-adventure, 8 scene props,
+ * ~1080x1080) and rejected: `createImageBitmap(Blob)` fails outright on
+ * SVG sources in this Chrome/headless build ("the source image could not
+ * be decoded" — confirmed even for a trivial <rect> SVG, so it's not
+ * fixable by e.g. adding explicit width/height), and `Image.src =
+ * URL.createObjectURL(blob)` measured *slower* (~38ms/frame) than the
+ * data-URI it was meant to replace (~18ms/frame) — Blob URL registration
+ * overhead outweighs the tiny XML string's encodeURIComponent cost.
+ * Reusing a single Image element instead of `new Image()` per frame was
+ * also measured and made no meaningful difference (object churn isn't
+ * the bottleneck; SVG decode+paint cost is). Keep this simple until
+ * there's a genuinely faster primitive to switch to.
+ *
  * Caveat: this is a real-time capture (it takes as long as the animation
- * itself), not a deterministic frame-by-frame renderer — good enough for
- * exporting these short mascot clips without adding a rendering pipeline.
+ * itself), not a deterministic frame-by-frame renderer. For clips heavy
+ * enough that this still drops frames, see the offline renderer
+ * (`npm run render`, src/render/) — same GSAP timelines, no real-time
+ * constraint at all.
  */
 export async function recordSvgAnimation(
   svg: SVGSVGElement,
@@ -82,29 +100,12 @@ export async function recordSvgAnimation(
     throw new Error("recordSvgAnimation: 2D canvas context unavailable");
   }
 
-  const svgWidth = svg.viewBox.baseVal.width || svg.clientWidth;
-  const svgHeight = svg.viewBox.baseVal.height || svg.clientHeight;
-  const scale = Math.min(width / svgWidth, height / svgHeight);
-  const drawWidth = svgWidth * scale;
-  const drawHeight = svgHeight * scale;
-  const drawX = (width - drawWidth) / 2;
-  const drawY = (height - drawHeight) / 2;
-
   let stopped = false;
   const drawFrame = () => {
     if (stopped) return;
-    const xml = new XMLSerializer().serializeToString(svg);
-    const img = new Image();
-    img.onload = () => {
-      if (transparent) {
-        ctx.clearRect(0, 0, width, height);
-      } else {
-        ctx.fillStyle = backgroundColor;
-        ctx.fillRect(0, 0, width, height);
-      }
-      ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
-    };
-    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(xml)}`;
+    rasterizeSvgToCanvas(svg, ctx, { width, height, transparent, backgroundColor }).catch(() => {
+      // Skip a frame that failed to rasterize rather than aborting the whole recording over it.
+    });
     requestAnimationFrame(drawFrame);
   };
   requestAnimationFrame(drawFrame);

@@ -12,6 +12,7 @@ import { ASPECT_PRESETS, DEFAULT_ASPECT_ID, getAspectPreset } from "@/export/asp
 import { BACKGROUNDS, DEFAULT_BACKGROUND_ID, getBackground } from "@/export/backgrounds";
 import { recordSvgAnimation } from "@/export/capture";
 import { downloadBlob } from "@/export/download";
+import { rasterizeSvgToCanvas } from "@/export/rasterize";
 import { expressions } from "@/svg/mascot/expressions";
 import mascotSvg from "@/svg/mascot/tequia-base.svg?raw";
 import { clearSceneProps } from "@/svg/utils/scene-props";
@@ -264,6 +265,46 @@ if (import.meta.env.DEV) {
     stage,
     get timeline() {
       return timeline;
+    },
+    // --- offline renderer support (scripts/render.mjs drives these) ---
+    // Never touched by the interactive UI — kept separate from the rest
+    // of this hook so it's obvious what's "just for poking around in
+    // devtools" vs. "an actual API another program depends on".
+    render: {
+      rasterizeSvgToCanvas,
+      listExperiments: () =>
+        experiments.map(({ id, label, description }) => ({ id, label, description })),
+      listAspects: () =>
+        ASPECT_PRESETS.map(({ id, label, width, height }) => ({
+          id,
+          label,
+          hint: `${width}x${height}`,
+        })),
+      listBackgrounds: () =>
+        BACKGROUNDS.map(({ id, label, kind, color }) => ({
+          id,
+          label,
+          hint: kind === "transparent" ? "canal alfa, asset reutilizable" : (color ?? ""),
+        })),
+      selectExperiment: (id: string) => setExperiment(id),
+      selectAspect: (id: string) => {
+        currentAspectId = id;
+        stage.setAspect(getAspectPreset(id));
+      },
+      selectBackground: (id: string) => {
+        currentBackgroundId = id;
+        stage.setBackground(getBackground(id));
+      },
+      getExportSettings: () => {
+        const aspect = getAspectPreset(currentAspectId);
+        const background = getBackground(currentBackgroundId);
+        return {
+          width: aspect.width,
+          height: aspect.height,
+          transparent: background.kind === "transparent",
+          backgroundColor: background.color ?? "#000000",
+        };
+      },
     },
   };
 }
