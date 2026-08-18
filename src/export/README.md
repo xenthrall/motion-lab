@@ -33,9 +33,10 @@ La arquitectura del backend (cola, librería en disco, API) está en
   descarga en vivo y lo que sale del render offline son los mismos
   píxeles.
 - `aspect-presets.ts` — formatos soportados (cuadrado, 4:5, 9:16, 16:9)
-  con su resolución de exportación. El mismo preset dimensiona el stage
-  en pantalla (`src/components/stage.ts`), así lo que se ve en el
-  navegador es lo que se exporta.
+  con su resolución de exportación **y el `viewBox` que le corresponde a
+  cada uno** (ver abajo). El mismo preset dimensiona el stage en pantalla
+  (`src/components/stage.ts`), así lo que se ve en el navegador es lo que
+  se exporta.
 - `backgrounds.ts` — los fondos disponibles (ver más abajo). El mismo
   preset pinta el fondo del stage en pantalla, mismo principio WYSIWYG
   que `aspect-presets.ts`.
@@ -47,6 +48,50 @@ deriva del `kind` del fondo elegido (`"solid"` → mp4, `"transparent"` →
 webm-transparent), así no existe una combinación inválida que elegir
 (antes formato de archivo y fondo eran selectores independientes y nada
 impedía, conceptualmente, pedir transparencia con un fondo sólido).
+
+## El cuadro se adapta al formato (sin letterbox)
+
+El SVG de la mascota trae un `viewBox` de 160x130, ajustado a su
+silueta. Usarlo tal cual para exportar tenía dos problemas:
+
+- **Recortaba la animación.** Todo lo que un experimento moviera fuera de
+  esa caja —un proyectil entrando, un cartel escalado, la sacudida de
+  cámara empujando la escena— quedaba cortado por el borde del `viewBox`.
+- **Metía barras.** Rasterizar 160x130 dentro de, digamos, 1080x1920
+  obligaba a centrar y dejar franjas muertas arriba y abajo, y encima el
+  fogonazo a "cuadro completo" solo cubría la franja del medio.
+
+Ahora `getAspectViewBox(preset)` deriva el `viewBox` del formato: mantiene
+la caja base de la mascota entera adentro, hace crecer el eje que haga
+falta hasta que la proporción coincida **exactamente** con la de salida, y
+centra en la mascota.
+
+| Formato | viewBox | Resultado |
+|---|---|---|
+| 1:1 | `10 -15 160 160` | 1080x1080 sin barras |
+| 4:5 | `10 -35 160 200` | 1080x1350 sin barras |
+| 9:16 | `10 -77.22 160 284.44` | 1080x1920 sin barras |
+| 16:9 | `-25.56 0 231.11 130` | 1920x1080 sin barras |
+
+Consecuencias:
+
+- La cuenta de letterbox de `rasterize.ts` queda en **no-op** (las
+  proporciones ya coinciden), así que el dibujo llena el archivo de borde
+  a borde. Verificado midiendo en el navegador: el `<svg>` ocupa el marco
+  completo en los tres formatos, con diferencia < 3px.
+- El espacio extra es **utilizable**: es donde ocurre la acción, en vez de
+  ser recorte.
+- La mascota conserva **el mismo tamaño relativo al ancho** que antes
+  (misma escala de rasterizado); lo que cambia es que el alto sobrante
+  pasó de barra muerta a escenario.
+- Un formato alto le da a la mascota una porción menor del cuadro, porque
+  el espacio tiene que salir de algún lado. Es intencional: la
+  alternativa es recortar la animación. Si en algún momento se quiere más
+  "zoom", se ajusta `BASE_FRAME` en `aspect-presets.ts` — un solo lugar.
+
+Los experimentos que necesiten los bordes reales deben pedirlos con
+`frameEdges()` (`src/svg/utils/view-box.ts`), nunca hardcodear
+coordenadas de borde — ver `src/animations/README.md`.
 
 ## Fondos (`backgrounds.ts`)
 

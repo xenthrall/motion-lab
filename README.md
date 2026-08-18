@@ -29,13 +29,7 @@ Ya hay una base funcional de punta a punta:
     ondas expansivas, explosiones de partículas, líneas de velocidad y
     **sacudida de cámara**. Con aleatoriedad sembrada, para que un render
     salga idéntico cada vez.
-- Cuatro **experimentos reales**, registrados en `src/experiments/registry.ts`:
-  - `mascot-intro` — entrada + idle + blink + bounce.
-  - `mascot-curiosity` — la mascota respira, nota un objeto que aparece en
-    escena, reacciona con curiosidad (ojos bien abiertos, mirada, cabeza
-    inclinada, se acerca, rebotitos), parpadea y vuelve a neutro. El
-    objeto es una prop de escena genérica (`src/svg/utils/scene-props.ts`),
-    no parte del SVG de la mascota.
+- Dos **experimentos reales**, registrados en `src/experiments/registry.ts`:
   - `mascot-adventure` — **"La aventura del código"**, ~19s: un `{ }`
     aparece y lo examina, un bicho la asusta y lo persigue hasta
     aplastarlo, se le prende el foco con una idea (ojos de estrella),
@@ -171,13 +165,13 @@ src/
 │   │                  #   popover, transport-controls, timeline-bar, status,
 │   │                  #   theme, toggle-group, icons, stage, format-icons,
 │   │                  #   experiment-icons, render-panel, render-card
-├── experiments/      # mascot-intro, -curiosity, -adventure, -rescue + registry.ts
+├── experiments/      # mascot-adventure, mascot-rescue + registry.ts
 ├── export/           # aspect-presets, backgrounds, rasterize (compartido), captura en vivo, descarga
 ├── render/           # entry.ts — página headless que maneja el renderer (render.html)
 ├── shared/           # render-api.ts — contrato compartido navegador ↔ backend ↔ CLI
 ├── svg/
 │   ├── mascot/        # SVG de la mascota + expressions.ts y accessories.ts
-│   └── utils/         # query-mascot.ts, inline-svg.ts, scene-props.ts
+│   └── utils/         # query-mascot, inline-svg, scene-props, view-box
 ├── utils/            # (vacío) helpers genéricos (dom, math, timing)
 ├── styles/           # global.css — solo el import de Tailwind + tokens de tema
 └── main.ts            # orquesta stage + controls + experimentos + export + panel de renders
@@ -324,8 +318,8 @@ reales, no solo compilando:
   dice qué hacer.
 - **Modo producción**: `npm start` (un solo proceso) sirve la app y
   renderiza **contra su propio build** — 145/145 frames de
-  `mascot-curiosity` en 4:5. Esto es lo que el viejo hook dev-only no
-  podía hacer.
+  `mascot-curiosity` en 4:5 (experimento ya retirado). Esto es lo que el
+  viejo hook dev-only no podía hacer.
 - Tema claro/oscuro y layout mobile (390px, sin overflow horizontal)
   verificados también en la vista de Renders.
 
@@ -344,10 +338,10 @@ Lo que ya existe está tachado; el resto sigue siendo hoja de ruta:
 3. ~~Animación idle.~~
 4. ~~Blink.~~
 5. ~~Bounce.~~
-6. ~~Timeline compuesta combinando varios de los anteriores.~~ (`mascot-intro`)
+6. ~~Timeline compuesta combinando varios de los anteriores.~~
 7. ~~Adaptaciones para formatos verticales de redes sociales.~~
 8. ~~Renderizado/exportación de animaciones.~~
-8b. ~~Reacción a un objeto/estímulo en escena (curiosidad).~~ (`mascot-curiosity`)
+8b. ~~Reacción a un objeto/estímulo en escena (curiosidad).~~
 8c. ~~Exportación con fondo transparente (asset reutilizable) y UI tipo
     reproductor de video (play/pausa real, línea de tiempo arrastrable).~~
 8d. ~~UI tipo panel administrativo (sidebar + galería + popovers para

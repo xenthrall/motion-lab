@@ -7,7 +7,15 @@ export interface RasterizeOptions {
 
 /**
  * Draws the SVG's *current* state onto `ctx`, letterboxed to fit
- * width x height. Shared by the live real-time exporter (capture.ts,
+ * width x height.
+ *
+ * In practice the letterboxing is now a no-op: the stage gives the SVG a
+ * viewBox whose aspect ratio already matches the target format (see
+ * getAspectViewBox in src/export/aspect-presets.ts), so the drawing fills
+ * the canvas edge to edge with no bars. The maths stays because it costs
+ * nothing and keeps this function correct for any SVG it's handed.
+ *
+ * Shared by the live real-time exporter (capture.ts,
  * called every requestAnimationFrame) and the offline frame-by-frame
  * renderer (via the headless render page, src/render/entry.ts, called
  * once per stepped frame) — one implementation of "how do we turn the

@@ -8,8 +8,6 @@ import { ui } from "./icons";
  * to a sensible default here.
  */
 const EXPERIMENT_ICONS: Record<string, string> = {
-  "mascot-intro": ui.sparkles,
-  "mascot-curiosity": ui.eye,
   "mascot-adventure": ui.rocket,
   "mascot-rescue": ui.siren,
 };

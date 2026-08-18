@@ -16,6 +16,7 @@ import { accessories } from "@/svg/mascot/accessories";
 import { expressions } from "@/svg/mascot/expressions";
 import type { MascotParts } from "@/svg/utils/query-mascot";
 import { appendSceneShape, upsertSceneLayer } from "@/svg/utils/scene-props";
+import { frameEdges } from "@/svg/utils/view-box";
 import gsap from "gsap";
 
 /**
@@ -96,12 +97,20 @@ export function createMascotRescueTimeline(parts: MascotParts): gsap.core.Timeli
   const check = appendSceneShape(fx, textGlyph("✓", 44, SUCCESS));
   const deployed = appendSceneShape(fx, textGlyph("DEPLOYED", 14, SUCCESS, 800));
 
+  // El marco ya no es fijo: depende del formato elegido (ver
+  // getAspectViewBox). Todo lo que tenga que entrar o salir de cuadro se
+  // posiciona respecto a sus bordes reales, no a números escritos a mano —
+  // si no, en 16:9 los proyectiles arrancarían ya visibles dentro del
+  // cuadro, y en 9:16 saldrían mucho antes de llegar al borde.
+  const frame = frameEdges(root);
+  const OFFSCREEN = 34;
+
   const hidden = { opacity: 0, transformOrigin: "50% 50%" };
   gsap.set(alert500, { x: 90, y: 64, scale: 3.2, ...hidden });
   gsap.set(alertLabel, { x: 90, y: 126, scale: 0.8, ...hidden });
-  gsap.set(error404, { x: 200, y: 72, ...hidden });
-  gsap.set(errorNull, { x: -20, y: 108, ...hidden });
-  gsap.set(bug, { x: 90, y: -25, ...hidden });
+  gsap.set(error404, { x: frame.right + OFFSCREEN, y: 72, ...hidden });
+  gsap.set(errorNull, { x: frame.left - OFFSCREEN, y: 108, ...hidden });
+  gsap.set(bug, { x: 90, y: frame.top - OFFSCREEN, ...hidden });
   gsap.set(boss, { x: 90, y: 60, scale: 0.15, ...hidden });
   gsap.set(check, { x: 90, y: 40, scale: 0.2, ...hidden });
   gsap.set(deployed, { x: 90, y: 122, scale: 0.6, ...hidden });
@@ -158,7 +167,11 @@ export function createMascotRescueTimeline(parts: MascotParts): gsap.core.Timeli
     "+=0.15",
   );
   tl.to(error404, { opacity: 1, duration: 0.1 }, "<");
-  tl.to(error404, { x: -30, rotation: -90, duration: 0.62, ease: "power1.in" }, "<");
+  tl.to(
+    error404,
+    { x: frame.left - OFFSCREEN, rotation: -90, duration: 0.62, ease: "power1.in" },
+    "<",
+  );
   tl.add(anticipate(parts, { squash: 0.6, duration: 0.18 }), "<0.12");
   tl.to(parts.mascot, { scaleX: 1, scaleY: 1, y: 0, duration: 0.25, ease: "back.out(2)" }, ">");
   tl.to(error404, { opacity: 0, duration: 0.01 }, "<");
@@ -169,16 +182,23 @@ export function createMascotRescueTimeline(parts: MascotParts): gsap.core.Timeli
     "+=0.1",
   );
   tl.to(errorNull, { opacity: 1, duration: 0.1 }, "<");
-  tl.to(errorNull, { x: 200, rotation: 120, duration: 0.62, ease: "power1.in" }, "<");
+  tl.to(
+    errorNull,
+    { x: frame.right + OFFSCREEN, rotation: 120, duration: 0.62, ease: "power1.in" },
+    "<",
+  );
   tl.add(bounce(parts, { height: 30, duration: 0.5 }), "<0.1");
   tl.to(errorNull, { opacity: 0, duration: 0.01 }, ">-0.1");
   tl.add(cameraShake([bg, fx], { intensity: 2, duration: 0.25, seed: 67 }), "<");
 
   tl.to(bug, { opacity: 1, duration: 0.1 }, "+=0.05");
-  tl.to(bug, { y: 128, rotation: 200, duration: 0.5, ease: "power1.in" }, "<");
+  tl.to(bug, { y: frame.bottom + OFFSCREEN, rotation: 200, duration: 0.5, ease: "power1.in" }, "<");
   tl.add(dash(parts, { x: -28, duration: 0.3, stretch: 1.25, returnBack: false }), "<0.12");
   tl.to(bug, { opacity: 0, duration: 0.01 }, ">-0.05");
-  tl.add(shockwave(fx, { x: 90, y: 124, to: 30, duration: 0.35, color: DANGER_SOFT }), "<");
+  tl.add(
+    shockwave(fx, { x: 90, y: frame.bottom - 6, to: 30, duration: 0.35, color: DANGER_SOFT }),
+    "<",
+  );
   tl.add(cameraShake([bg, fx], { intensity: 3, duration: 0.3, seed: 71 }), "<");
 
   // --- 5. Contraataque -----------------------------------------------------

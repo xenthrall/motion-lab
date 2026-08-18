@@ -1,5 +1,5 @@
 import { experiments } from "@/experiments/registry";
-import { ASPECT_PRESETS, getAspectPreset } from "@/export/aspect-presets";
+import { ASPECT_PRESETS, aspectViewBoxAttribute, getAspectPreset } from "@/export/aspect-presets";
 import { BACKGROUNDS, getBackground } from "@/export/backgrounds";
 import { rasterizeSvgToCanvas } from "@/export/rasterize";
 import type { RenderPageApi, RenderPlan, RenderRequest } from "@/shared/render-api";
@@ -116,6 +116,12 @@ const api: RenderPageApi = {
     timeline?.kill();
     clearSceneProps(parts.root);
     resetVisualState();
+
+    // The frame must be set *before* the timeline is built: experiments read
+    // the viewBox to place things off-screen, and the viewBox depends on the
+    // chosen format (see getAspectViewBox). Getting this order wrong would
+    // compose the animation for one frame and render it into another.
+    svg.setAttribute("viewBox", aspectViewBoxAttribute(aspect));
 
     // Timelines auto-play on creation; freeze immediately, the engine drives
     // time by hand from here on.

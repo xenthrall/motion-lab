@@ -60,7 +60,7 @@ saltar) siempre debe animar `parts.mascot`.
 
 `setExpression` no anima una forma existente, la **reemplaza** — usa los
 presets de `src/svg/mascot/expressions.ts` (`neutral`, `surprised`,
-`happy`, `starstruck`, `dizzy`, `determined`, `wink`):
+`happy`, `starstruck`, `dizzy`, `determined`, `wink`, `angry`, `panic`):
 
 ```ts
 tl.add(setExpression(parts, expressions.starstruck), "<");
@@ -200,11 +200,38 @@ devuelve un `<g>` vacío al que se le van agregando formas con
 (si ya existe una prop con ese id, la reemplazan) y quedan marcadas con
 `data-scene-prop` para que `clearSceneProps(root)` pueda limpiarlas al
 cambiar de experimento — eso ya lo hace `main.ts` en `setExperiment()`,
-no hace falta repetirlo por experimento. Ver
-`src/experiments/mascot-curiosity.ts` (un objeto simple),
-`src/experiments/mascot-adventure.ts` (varios objetos compuestos) y
-`src/experiments/mascot-rescue.ts` (dos capas + efectos + accesorios, el
-más completo) como ejemplos, todos con su guion documentado en el archivo.
+no hace falta repetirlo por experimento. Ver `src/experiments/mascot-adventure.ts` (varios objetos compuestos) y
+`src/experiments/mascot-rescue.ts` (dos capas + efectos + accesorios +
+entradas fuera de cuadro, el más completo) como ejemplos, ambos con su
+guion documentado en el archivo.
+
+## El cuadro no es fijo
+
+El `viewBox` del SVG **cambia con la relación de aspecto elegida** (ver
+`getAspectViewBox` en `src/export/aspect-presets.ts`): 160x160 en 1:1,
+160x284 en 9:16, 231x130 en 16:9. Siempre contiene la caja base de la
+mascota (centrada en 90,65) y crece hacia afuera, así que sus coordenadas
+—ojos en y≈67-89, boca en y≈99-113— no cambian nunca.
+
+Lo que sí cambia es dónde están los **bordes**. Cualquier cosa que tenga
+que entrar o salir de cuadro debe preguntarlos, no escribirlos a mano:
+
+```ts
+import { frameEdges } from "@/svg/utils/view-box";
+
+const frame = frameEdges(parts.root);
+gsap.set(proyectil, { x: frame.right + 34, y: 72 });   // fuera de cuadro, a la derecha
+tl.to(proyectil, { x: frame.left - 34, duration: 0.6 });
+```
+
+Con un número fijo (`x: 200`), en 16:9 el proyectil arrancaría **ya
+visible** dentro del cuadro, y en 9:16 saldría mucho antes de llegar al
+borde. Los efectos ya lo hacen solos (`flash` cubre el cuadro real,
+`speedLines` lo cruza entero).
+
+> El timeline se reconstruye al cambiar de formato, justamente para que
+> estas medidas se recalculen — lo hace `main.ts` en `onAspectChange`, y
+> la página de render fija el `viewBox` antes de construir el timeline.
 
 ## Componer una animación (un "experimento")
 

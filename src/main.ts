@@ -36,16 +36,25 @@ if (!app) {
 }
 
 app.innerHTML = `
-  <div class="flex min-h-screen flex-col md:flex-row">
+  <div class="flex min-h-screen flex-col md:h-screen md:flex-row">
     <aside
       id="sidebar-container"
       class="w-full border-b border-line bg-surface md:sticky md:top-0 md:h-screen md:w-64 md:shrink-0 md:overflow-y-auto md:border-b-0 md:border-r"
     ></aside>
-    <main class="flex flex-1 flex-col px-4 py-6 sm:px-8 sm:py-10">
-      <div id="lab-view" class="flex flex-col items-center gap-5">
-        <div id="toolbar-container" class="w-full max-w-md"></div>
-        <div id="stage-container" class="w-full"></div>
-        <div id="timeline-bar-container" class="w-full max-w-md"></div>
+    <!-- The lab column is a full-height flex chain (min-h-0 at every level,
+         or a flex child refuses to shrink below its content) so the stage
+         can claim every pixel the toolbar and transport don't need. -->
+    <main class="flex flex-1 flex-col px-4 py-5 sm:px-8 sm:py-6 md:min-h-0 md:overflow-y-auto">
+      <div id="lab-view" class="flex flex-1 flex-col items-center gap-4 md:min-h-0">
+        <!-- Anchos más generosos que el stage anterior: con el marco grande,
+             una barra de 28rem se veía apretada y el toolbar se partía en
+             dos filas. -->
+        <div id="toolbar-container" class="w-full max-w-2xl"></div>
+        <div
+          id="stage-container"
+          class="flex min-h-[45vh] w-full flex-1 items-center justify-center md:min-h-0"
+        ></div>
+        <div id="timeline-bar-container" class="w-full max-w-xl"></div>
         <div id="transport-container"></div>
         <div id="status-container"></div>
       </div>
@@ -231,6 +240,12 @@ const toolbar = createToolbar(toolbarContainer, aspectItems, backgroundItems, {
   onAspectChange(id) {
     currentAspectId = id;
     stage.setAspect(getAspectPreset(id));
+    // Changing the format changes the viewBox, and experiments read it when
+    // they build (to start a projectile just off-screen, for instance), so
+    // the timeline has to be rebuilt against the new frame. Rebuilding
+    // restarts playback, which is also the quickest way to see the new
+    // framing.
+    setExperiment(currentExperimentId);
     syncRenderForm();
   },
   onBackgroundChange(id) {

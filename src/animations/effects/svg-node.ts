@@ -16,24 +16,11 @@ export function svgNode<K extends keyof SVGElementTagNameMap>(
   return el;
 }
 
-export interface ViewBox {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-/** The coordinate space an effect is drawing into, read from the SVG it
- * lives in — so a full-frame flash covers the frame whatever the mascot's
- * viewBox happens to be, instead of hardcoding today's numbers. */
-export function viewBoxOf(node: SVGElement): ViewBox {
-  const svg = node.ownerSVGElement;
-  const box = svg?.viewBox.baseVal;
-  if (!box || box.width === 0) {
-    return { x: 0, y: 0, width: 100, height: 100 };
-  }
-  return { x: box.x, y: box.y, width: box.width, height: box.height };
-}
+// Re-exported so effects have one import for their SVG plumbing. The
+// implementation is shared with experiments (src/svg/utils/view-box.ts)
+// because both need the same answer: the frame is not a constant, it
+// changes with the chosen aspect ratio.
+export { type ViewBox, viewBoxOf } from "@/svg/utils/view-box";
 
 /**
  * Deterministic pseudo-random (mulberry32).
