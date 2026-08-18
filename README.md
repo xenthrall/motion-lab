@@ -29,14 +29,22 @@ Ya hay una base funcional de punta a punta:
     inclinada, se acerca, rebotitos), parpadea y vuelve a neutro. El
     objeto es una prop de escena genérica (`src/svg/utils/scene-props.ts`),
     no parte del SVG de la mascota.
-- Un **lab interactivo** (`npm run dev`), con UI en Tailwind y responsive
-  (probado en desktop y mobile), que funciona casi como un reproductor de
-  video: selector de experimento y de relación de aspecto (con iconos,
-  incluyendo el logo de la red social a la que corresponde cada formato),
-  **línea de tiempo arrastrable** con duración calculada y tiempo actual,
-  botón de play que **refleja si está reproduciendo o en pausa** (icono +
-  texto), reiniciar, y **descargar** en el formato de archivo elegido, con
-  feedback de estado (badge con spinner mientras graba, éxito/error).
+- Un **lab interactivo** (`npm run dev`) con layout de **panel
+  administrativo**, responsive (probado en desktop y mobile) y con
+  **tema claro/oscuro** (toggle manual, persistido, respeta la
+  preferencia del sistema por defecto, sin flash del tema incorrecto al
+  recargar):
+  - **Sidebar** — galería de experimentos (tarjetas con ícono +
+    descripción; seleccionar una la reproduce en bucle al instante) y el
+    toggle de tema.
+  - **Centro de pantalla** — solo la preview: el stage, una **línea de
+    tiempo arrastrable** (duración calculada, tiempo actual) y los
+    controles de transporte (reiniciar / play-pausa que **refleja el
+    estado real** / **bucle activable-desactivable**).
+  - **Toolbar compacto** sobre la preview — relación de aspecto y formato
+    de archivo son dos botones que abren un **popover** con las opciones
+    (en vez de ocupar espacio fijo en pantalla), más el botón de
+    descarga.
 - **Exportación a dos formatos de archivo** (`src/export/`), con APIs
   nativas del navegador (canvas + `MediaRecorder`) — sin dependencias
   nuevas:
@@ -62,8 +70,11 @@ timelines más orgánicas) — ver [Próximos experimentos](#próximos-experimen
 - **Biome** — lint + formato en una sola herramienta.
 - **SVGO** (dev) — optimización de SVG para el pipeline de assets.
 - **Tailwind CSS v4** (vía `@tailwindcss/vite`) — estilos de la **UI del
-  lab únicamente** (stage, pills, botones, badge de estado). No toca la
-  animación de la mascota: eso lo sigue escribiendo GSAP directamente.
+  lab únicamente** (sidebar, toolbar, stage, controles, badges). No toca
+  la animación de la mascota: eso lo sigue escribiendo GSAP directamente.
+  Tema claro/oscuro con `@custom-variant dark` + tokens semánticos
+  (`bg-surface`, `text-ink`, etc. — ver `src/styles/global.css`), así los
+  componentes no repiten pares `dark:` en cada clase.
 - **lucide-static** / **simple-icons** (dev) — iconos SVG puros (interfaz
   y logos de redes sociales respectivamente), importados con `?raw`, el
   mismo patrón que ya se usaba para el SVG de la mascota.
@@ -83,7 +94,11 @@ src/
 │   ├── moves/        # entrance, idleBreathing, blink, bounce, tilt, lean,
 │   │                  # eyesShift, widenEyes, settle (composables)
 │   └── README.md      # convención para componer/agregar animaciones
-├── components/       # stage, controls, timeline-bar, status, icons — UI del lab (Tailwind), sin framework
+├── components/       # UI del lab (Tailwind), sin framework:
+│   │                  #   sidebar, experiment-gallery, toolbar, option-picker,
+│   │                  #   popover, transport-controls, timeline-bar, status,
+│   │                  #   theme, toggle-group, icons, stage, format-icons,
+│   │                  #   experiment-icons
 ├── experiments/      # mascot-intro.ts, mascot-curiosity.ts + registry.ts
 ├── export/           # aspect-presets, file-formats, captura a video (MediaRecorder), descarga
 ├── svg/
@@ -111,24 +126,31 @@ npm run lint        # revisa lint/formato con Biome
 npm run format       # aplica formato con Biome
 ```
 
-En `npm run dev`: elegí un experimento, una relación de aspecto y un
-formato de archivo, reproducí/pausá/arrastrá la línea de tiempo para
-verlo en vivo, y usá **"Descargar video"** para exportar exactamente lo
-que se está reproduciendo en pantalla, en la resolución y formato
-elegidos.
+En `npm run dev`: elegí un experimento en la galería del sidebar (arranca
+en bucle al instante), ajustá relación de aspecto/formato de archivo
+desde los popovers del toolbar, reproducí/pausá/arrastrá la línea de
+tiempo o desactivá el bucle, y usá **"Descargar"** para exportar
+exactamente lo que se está reproduciendo en pantalla.
 
 **Verificado en un navegador real** (Chrome headless vía Playwright, no
-solo compilación): la mascota se mueve de verdad durante la reproducción,
-play/pausa/reiniciar/scrub funcionan como en un reproductor de video real
-(pausa y reanuda desde la misma posición, no reinicia; arrastrar la línea
-de tiempo salta a ese punto), el layout no tiene overflow horizontal en
-mobile (390px) y se ve correctamente en desktop, el MP4 exportado es
-H.264 válido (confirmado con `ffprobe`), y el WebM transparente exportado
-se decodificó de vuelta **en el propio navegador** para confirmar que el
-canal alfa es real (esquina `[0,0,0,0]`, mascota opaca `alfa=255`) — no
-alcanza con mirar el archivo, porque `ffmpeg` en línea de comandos no
-compone ese canal alfa por defecto al extraer un frame (ver
-`src/export/README.md`).
+solo compilación): autoplay + bucle al seleccionar un experimento
+(confirmado con el estado real del timeline de GSAP, no solo visualmente
+— el bucle reinicia limpio en `time: 0` justo al llegar a la duración
+total), desactivar el bucle sí detiene la reproducción al terminar,
+play/pausa/reiniciar/scrub funcionan como un reproductor real (pausa y
+reanuda desde la misma posición), los popovers de aspecto/formato abren
+en el punto donde se hace click, cierran al seleccionar o al hacer click
+afuera (mouse y touch), sidebar/toolbar/transporte se deshabilitan
+correctamente durante una exportación en curso (evita el caso borde de
+cambiar de experimento a mitad de una grabación) y se rehabilitan al
+terminar, el tema claro/oscuro persiste entre recargas sin flash del
+tema incorrecto, el layout no tiene overflow horizontal en mobile (390px)
+y se ve correctamente en desktop, el MP4 exportado es H.264 válido
+(confirmado con `ffprobe`), y el WebM transparente exportado se decodificó
+de vuelta **en el propio navegador** para confirmar que el canal alfa es
+real (esquina `[0,0,0,0]`, mascota opaca `alfa=255`) — no alcanza con
+mirar el archivo, porque `ffmpeg` en línea de comandos no compone ese
+canal alfa por defecto al extraer un frame (ver `src/export/README.md`).
 
 En consola del navegador, en modo dev, `window.__lab` expone `gsap`,
 `stage` y el `timeline` actual para inspección manual (no existe en el
@@ -149,6 +171,8 @@ Lo que ya existe está tachado; el resto sigue siendo hoja de ruta:
 8b. ~~Reacción a un objeto/estímulo en escena (curiosidad).~~ (`mascot-curiosity`)
 8c. ~~Exportación con fondo transparente (asset reutilizable) y UI tipo
     reproductor de video (play/pausa real, línea de tiempo arrastrable).~~
+8d. ~~UI tipo panel administrativo (sidebar + galería + popovers para
+    formato), bucle activable/desactivable, tema claro/oscuro.~~
 9. Cambiar expresiones (variantes de forma de EYES/MOUTH, no solo
    transformarlos — ver `src/svg/mascot/README.md`).
 10. Animación de accesorios (`EXTRA`).

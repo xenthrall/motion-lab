@@ -1,19 +1,47 @@
 @import "tailwindcss";
 
 /*
- * Theme tokens matching the mascot's own gradient/accent — used as
- * bg-brand / text-brand / from-brand / etc. Kept here (not @apply'd
- * everywhere) so the UI's accent color stays visually tied to the
- * mascot's identity without hardcoding hex values across components.
+ * Manual (class-based) dark mode instead of Tailwind's default
+ * media-query-only `dark:` — toggled by src/components/theme.ts adding
+ * "dark" to <html>. index.html has a tiny inline script that applies
+ * this before first paint to avoid a flash of the wrong theme.
  */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
+  /* Brand accent — matches the mascot's own gradient, same in both themes. */
   --color-brand-light: #c084fc;
   --color-brand: #7c3aed;
   --color-brand-dark: #4c1d95;
   --color-brand-ring: #c4b5fd;
   --color-accent: #facc15;
+
+  /*
+   * Semantic surface/text tokens. These are plain CSS custom properties,
+   * redefined under .dark below — so a single utility (bg-surface,
+   * text-ink, etc.) adapts to both themes automatically, instead of every
+   * component needing its own light/dark class pair.
+   */
+  --color-bg: #fafafa;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f4f4f5;
+  --color-line: #e4e4e7;
+  --color-ink: #18181b;
+  --color-ink-muted: #71717a;
+  --color-ink-subtle: #a1a1aa;
 }
 
 :root {
+  color-scheme: light;
+}
+
+.dark {
   color-scheme: dark;
+  --color-bg: #09090b;
+  --color-surface: #18181b;
+  --color-surface-muted: #27272a;
+  --color-line: #3f3f46;
+  --color-ink: #fafafa;
+  --color-ink-muted: #a1a1aa;
+  --color-ink-subtle: #71717a;
 }

@@ -10,10 +10,10 @@ const BADGE_BASE =
   "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors";
 
 const KIND_CLASSES: Record<StatusKind, string> = {
-  idle: "bg-white/5 text-neutral-400 ring-1 ring-white/10",
-  recording: "bg-amber-500/15 text-amber-300 ring-1 ring-amber-400/30",
-  success: "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/30",
-  error: "bg-red-500/15 text-red-300 ring-1 ring-red-400/30",
+  idle: "bg-surface-muted text-ink-muted ring-1 ring-line",
+  recording: "bg-amber-500/15 text-amber-600 dark:text-amber-300 ring-1 ring-amber-400/30",
+  success: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 ring-1 ring-emerald-400/30",
+  error: "bg-red-500/15 text-red-600 dark:text-red-300 ring-1 ring-red-400/30",
 };
 
 export function createStatus(container: Element): Status {

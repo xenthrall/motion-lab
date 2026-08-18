@@ -23,10 +23,10 @@ export function createTimelineBar(
 ): TimelineBar {
   container.innerHTML = `
     <div class="flex items-center gap-3">
-      <span id="time-current" class="w-9 shrink-0 text-right text-xs tabular-nums text-neutral-400">0:00</span>
+      <span id="time-current" class="w-9 shrink-0 text-right text-xs tabular-nums text-ink-muted">0:00</span>
       <div
         id="scrub-track"
-        class="group relative h-2 flex-1 cursor-pointer touch-none rounded-full bg-white/10"
+        class="group relative h-2 flex-1 cursor-pointer touch-none rounded-full bg-surface-muted"
       >
         <div
           id="scrub-fill"
@@ -35,11 +35,11 @@ export function createTimelineBar(
         ></div>
         <div
           id="scrub-handle"
-          class="pointer-events-none absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow ring-2 ring-brand transition-transform group-hover:scale-110"
+          class="pointer-events-none absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-surface shadow ring-2 ring-brand transition-transform group-hover:scale-110"
           style="left: 0%"
         ></div>
       </div>
-      <span id="time-total" class="w-9 shrink-0 text-xs tabular-nums text-neutral-400">0:00</span>
+      <span id="time-total" class="w-9 shrink-0 text-xs tabular-nums text-ink-muted">0:00</span>
     </div>
   `;
 

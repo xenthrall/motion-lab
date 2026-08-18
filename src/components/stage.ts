@@ -11,7 +11,7 @@ export interface Stage {
 }
 
 const FRAME_CLASS =
-  "relative mx-auto flex w-full max-w-xs max-h-[70vh] items-center justify-center overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-neutral-900 to-black shadow-2xl shadow-black/40 sm:max-w-sm";
+  "relative mx-auto flex w-full max-w-sm max-h-[60vh] items-center justify-center overflow-hidden rounded-2xl border border-line bg-surface-muted shadow-inner sm:max-w-md";
 
 export function createStage(container: Element, svgMarkup: string): Stage {
   const frame = document.createElement("div");

@@ -1,7 +1,12 @@
-import { createControls } from "@/components/controls";
+import { ASPECT_ICONS } from "@/components/format-icons";
+import { brandIcon, transparencySwatch, ui, uiIcon } from "@/components/icons";
+import { createSidebar } from "@/components/sidebar";
 import { createStage } from "@/components/stage";
 import { createStatus } from "@/components/status";
+import { type Theme, applyTheme, getInitialTheme } from "@/components/theme";
 import { createTimelineBar } from "@/components/timeline-bar";
+import { createToolbar } from "@/components/toolbar";
+import { createTransportControls } from "@/components/transport-controls";
 import { experiments } from "@/experiments/registry";
 import { ASPECT_PRESETS, DEFAULT_ASPECT_ID, getAspectPreset } from "@/export/aspect-presets";
 import { type ExportFormat, recordSvgAnimation } from "@/export/capture";
@@ -12,12 +17,13 @@ import { clearSceneProps } from "@/svg/utils/scene-props";
 import gsap from "gsap";
 
 /**
- * Lab entry point: mounts the mascot, lets you pick an experiment, an
- * aspect ratio and a file format, scrub/play/restart it live in the
- * browser like a video player, and export the current playback to a
- * downloadable file. No animation logic lives here — it only wires
- * together src/animations, src/experiments, src/export and
- * src/components.
+ * Lab entry point — an admin-panel-style layout: a sidebar for browsing
+ * experiments (a gallery, selecting one plays it looping immediately) and
+ * app-level settings (theme), and a center panel that's just the preview
+ * (stage + timeline scrubber + transport controls) with a compact toolbar
+ * for aspect ratio / file format (each opens a small popover) and export.
+ * No animation logic lives here — it only wires together src/animations,
+ * src/experiments, src/export and src/components.
  */
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) {
@@ -25,39 +31,54 @@ if (!app) {
 }
 
 app.innerHTML = `
-  <div class="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-12">
-    <header class="text-center">
-      <h1 class="text-2xl font-bold tracking-tight text-white sm:text-3xl">Tequia Motion Lab</h1>
-      <p class="mt-1 text-sm text-neutral-400">Previsualizá y exportá animaciones de la mascota</p>
-    </header>
-
-    <div class="rounded-3xl border border-white/10 bg-white/[0.03] p-4 shadow-xl backdrop-blur sm:p-6">
-      <div id="stage-container"></div>
-      <div id="timeline-bar-container" class="mt-4"></div>
-      <div id="controls-container" class="mt-6"></div>
-    </div>
-
-    <div id="status-container" class="flex justify-center"></div>
+  <div class="flex min-h-screen flex-col md:flex-row">
+    <aside
+      id="sidebar-container"
+      class="w-full border-b border-line bg-surface md:sticky md:top-0 md:h-screen md:w-64 md:shrink-0 md:overflow-y-auto md:border-b-0 md:border-r"
+    ></aside>
+    <main class="flex flex-1 flex-col items-center gap-5 px-4 py-6 sm:px-8 sm:py-10">
+      <div id="toolbar-container" class="w-full max-w-md"></div>
+      <div id="stage-container" class="w-full"></div>
+      <div id="timeline-bar-container" class="w-full max-w-md"></div>
+      <div id="transport-container"></div>
+      <div id="status-container"></div>
+    </main>
   </div>
 `;
 
+const sidebarContainer = app.querySelector<HTMLDivElement>("#sidebar-container");
+const toolbarContainer = app.querySelector<HTMLDivElement>("#toolbar-container");
 const stageContainer = app.querySelector<HTMLDivElement>("#stage-container");
 const timelineBarContainer = app.querySelector<HTMLDivElement>("#timeline-bar-container");
-const controlsContainer = app.querySelector<HTMLDivElement>("#controls-container");
+const transportContainer = app.querySelector<HTMLDivElement>("#transport-container");
 const statusContainer = app.querySelector<HTMLDivElement>("#status-container");
-if (!stageContainer || !timelineBarContainer || !controlsContainer || !statusContainer) {
+if (
+  !sidebarContainer ||
+  !toolbarContainer ||
+  !stageContainer ||
+  !timelineBarContainer ||
+  !transportContainer ||
+  !statusContainer
+) {
   throw new Error("main: expected layout elements were not found");
 }
 
+let currentTheme: Theme = getInitialTheme();
+applyTheme(currentTheme);
+
 const stage = createStage(stageContainer, mascotSvg);
 const status = createStatus(statusContainer);
+const timelineBar = createTimelineBar(timelineBarContainer, (seconds) => {
+  timeline.pause(seconds);
+  transport.setPlaying(false);
+});
 
 function resetVisualState(): void {
   // Some moves (e.g. entrance's gsap.from) render their starting values
   // immediately on creation — harmless once playback starts, but it means
   // a freshly created, not-yet-played timeline can leave the mascot stuck
-  // looking invisible/mid-pose. Reset right after creating a timeline so
-  // the idle preview always shows the mascot normally until Play is hit.
+  // looking invisible/mid-pose for an instant. Reset right after creating
+  // a timeline so nothing weird flashes before playback kicks in.
   gsap.set([stage.parts.mascot, stage.parts.eyes], { clearProps: "all" });
 }
 
@@ -66,11 +87,8 @@ let currentFileFormat: ExportFormat = DEFAULT_FILE_FORMAT;
 let currentExperimentId = experiments[0].id;
 let timeline = experiments[0].create(stage.parts);
 let pendingResolve: (() => void) | null = null;
-
-const timelineBar = createTimelineBar(timelineBarContainer, (seconds) => {
-  timeline.pause(seconds);
-  controls.setPlaying(false);
-});
+let loopEnabled = true;
+let isExporting = false;
 
 function wireTimeline(): void {
   resetVisualState();
@@ -78,10 +96,14 @@ function wireTimeline(): void {
     timelineBar.setProgress(timeline.time());
   });
   timeline.eventCallback("onComplete", () => {
-    controls.setPlaying(false);
     const resolve = pendingResolve;
     pendingResolve = null;
     resolve?.();
+    if (loopEnabled && !isExporting) {
+      timeline.restart();
+      return;
+    }
+    transport.setPlaying(false);
   });
   timelineBar.setDuration(timeline.duration());
   timelineBar.setProgress(0);
@@ -93,15 +115,15 @@ function setExperiment(id: string): void {
   clearSceneProps(stage.parts.root);
   currentExperimentId = definition.id;
   timeline = definition.create(stage.parts);
-  controls.setPlaying(false);
   wireTimeline();
+  void playFromStart();
 }
 
-/** Always plays the whole clip from the start — used by Restart and Export. */
+/** Always plays the whole clip from the start — used by Restart, Export, and picking a new experiment. */
 function playFromStart(): Promise<void> {
   return new Promise((resolve) => {
     pendingResolve = resolve;
-    controls.setPlaying(true);
+    transport.setPlaying(true);
     timeline.restart();
   });
 }
@@ -109,76 +131,113 @@ function playFromStart(): Promise<void> {
 function togglePlayPause(): void {
   if (timeline.isActive() && !timeline.paused()) {
     timeline.pause();
-    controls.setPlaying(false);
+    transport.setPlaying(false);
     return;
   }
   if (timeline.progress() >= 1) {
     void playFromStart();
     return;
   }
-  controls.setPlaying(true);
+  transport.setPlaying(true);
   timeline.play();
 }
 
-const controls = createControls(
-  controlsContainer,
+const sidebar = createSidebar(
+  sidebarContainer,
+  experiments.map(({ id, label, description }) => ({ id, label, description })),
   {
-    experiments: experiments.map(({ id, label }) => ({ id, label })),
-    aspects: ASPECT_PRESETS.map(({ id, label }) => ({ id, label })),
-    fileFormats: FILE_FORMATS.map(({ id, label }) => ({ id, label })),
-  },
-  {
-    onExperimentChange(id) {
+    onExperimentSelect(id) {
       setExperiment(id);
       const label = experiments.find((experiment) => experiment.id === id)?.label ?? id;
       status.set(label, "idle");
     },
-    onAspectChange(id) {
-      currentAspectId = id;
-      stage.setAspect(getAspectPreset(id));
-    },
-    onFileFormatChange(id) {
-      currentFileFormat = id as ExportFormat;
-    },
-    onPlayToggle() {
-      togglePlayPause();
-    },
-    onRestart() {
-      void playFromStart();
-    },
-    async onExport() {
-      const aspect = getAspectPreset(currentAspectId);
-      const fileFormat = getFileFormat(currentFileFormat);
-      controls.setExportEnabled(false);
-      controls.setPlaybackControlsEnabled(false);
-      timelineBar.setEnabled(false);
-      controls.setExporting(true);
-      status.set("Grabando…", "recording");
-      try {
-        const { blob, extension } = await recordSvgAnimation(stage.svg, playFromStart, {
-          width: aspect.width,
-          height: aspect.height,
-          format: fileFormat.id,
-        });
-        downloadBlob(
-          blob,
-          `tequia-${currentExperimentId}-${aspect.id}-${fileFormat.id}.${extension}`,
-        );
-        status.set(`Exportado — ${aspect.label} · ${fileFormat.label}`, "success");
-      } catch (error) {
-        status.set(`Error al exportar: ${(error as Error).message}`, "error");
-      } finally {
-        controls.setExportEnabled(true);
-        controls.setPlaybackControlsEnabled(true);
-        timelineBar.setEnabled(true);
-        controls.setExporting(false);
-      }
+    onThemeToggle() {
+      currentTheme = currentTheme === "dark" ? "light" : "dark";
+      applyTheme(currentTheme);
+      sidebar.setTheme(currentTheme);
     },
   },
 );
+sidebar.setTheme(currentTheme);
+
+const aspectItems = ASPECT_PRESETS.map((preset) => {
+  const icons = ASPECT_ICONS[preset.id];
+  const shape = uiIcon(icons?.shape ?? ui.square, "w-4 h-4");
+  const mark = icons ? brandIcon(icons.brand, "w-3 h-3 opacity-60") : "";
+  return {
+    id: preset.id,
+    label: preset.label,
+    iconHtml: `<span class="inline-flex items-center gap-1">${shape}${mark}</span>`,
+  };
+});
+
+const fileFormatItems = FILE_FORMATS.map((format) => ({
+  id: format.id,
+  label: format.label,
+  iconHtml:
+    format.id === "webm-transparent" ? transparencySwatch("w-4 h-4") : uiIcon(ui.film, "w-4 h-4"),
+}));
+
+const toolbar = createToolbar(toolbarContainer, aspectItems, fileFormatItems, {
+  onAspectChange(id) {
+    currentAspectId = id;
+    stage.setAspect(getAspectPreset(id));
+  },
+  onFileFormatChange(id) {
+    currentFileFormat = id as ExportFormat;
+  },
+  async onExport() {
+    const aspect = getAspectPreset(currentAspectId);
+    const fileFormat = getFileFormat(currentFileFormat);
+    isExporting = true;
+    toolbar.setExportEnabled(false);
+    toolbar.setPickersEnabled(false);
+    toolbar.setExporting(true);
+    transport.setEnabled(false);
+    timelineBar.setEnabled(false);
+    sidebar.gallery.setEnabled(false);
+    status.set("Grabando…", "recording");
+    try {
+      const { blob, extension } = await recordSvgAnimation(stage.svg, playFromStart, {
+        width: aspect.width,
+        height: aspect.height,
+        format: fileFormat.id,
+      });
+      downloadBlob(
+        blob,
+        `tequia-${currentExperimentId}-${aspect.id}-${fileFormat.id}.${extension}`,
+      );
+      status.set(`Exportado — ${aspect.label} · ${fileFormat.label}`, "success");
+    } catch (error) {
+      status.set(`Error al exportar: ${(error as Error).message}`, "error");
+    } finally {
+      isExporting = false;
+      toolbar.setExportEnabled(true);
+      toolbar.setPickersEnabled(true);
+      toolbar.setExporting(false);
+      transport.setEnabled(true);
+      timelineBar.setEnabled(true);
+      sidebar.gallery.setEnabled(true);
+    }
+  },
+});
+
+const transport = createTransportControls(transportContainer, {
+  onPlayToggle() {
+    togglePlayPause();
+  },
+  onRestart() {
+    void playFromStart();
+  },
+  onLoopToggle() {
+    loopEnabled = !loopEnabled;
+    transport.setLooping(loopEnabled);
+  },
+});
 
 wireTimeline();
 status.set(`gsap ${gsap.version} · listo`, "idle");
+void playFromStart();
 
 if (import.meta.env.DEV) {
   (window as unknown as { __lab: unknown }).__lab = {

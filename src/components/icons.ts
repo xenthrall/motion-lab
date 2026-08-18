@@ -1,14 +1,18 @@
+import chevronDownRaw from "lucide-static/icons/chevron-down.svg?raw";
 import downloadRaw from "lucide-static/icons/download.svg?raw";
 import eyeRaw from "lucide-static/icons/eye.svg?raw";
 import filmRaw from "lucide-static/icons/film.svg?raw";
 import loaderRaw from "lucide-static/icons/loader-2.svg?raw";
+import moonRaw from "lucide-static/icons/moon.svg?raw";
 import pauseRaw from "lucide-static/icons/pause.svg?raw";
 import playRaw from "lucide-static/icons/play.svg?raw";
 import rectangleHorizontalRaw from "lucide-static/icons/rectangle-horizontal.svg?raw";
 import rectangleVerticalRaw from "lucide-static/icons/rectangle-vertical.svg?raw";
+import repeatRaw from "lucide-static/icons/repeat.svg?raw";
 import rotateCcwRaw from "lucide-static/icons/rotate-ccw.svg?raw";
 import sparklesRaw from "lucide-static/icons/sparkles.svg?raw";
 import squareRaw from "lucide-static/icons/square.svg?raw";
+import sunRaw from "lucide-static/icons/sun.svg?raw";
 import instagramRaw from "simple-icons/icons/instagram.svg?raw";
 import tiktokRaw from "simple-icons/icons/tiktok.svg?raw";
 import youtubeRaw from "simple-icons/icons/youtube.svg?raw";
@@ -26,6 +30,10 @@ export const ui = {
   sparkles: sparklesRaw,
   eye: eyeRaw,
   film: filmRaw,
+  chevronDown: chevronDownRaw,
+  repeat: repeatRaw,
+  sun: sunRaw,
+  moon: moonRaw,
 } as const;
 
 /** Solid brand/social icons (simple-icons) — no fill set, need one injected. */
